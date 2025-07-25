@@ -18,6 +18,7 @@ import platform
 import random
 import shutil
 import socket
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -1666,6 +1667,15 @@ def get_compatible_tts_engines(language):
         if language in language_tts.get(tts, {})
     ]
     return compatible_engines
+# A higher stddev_factor removes fewer chapters (only extremely short ones), while a lower value removes more chapters (including mildly short ones).
+def filter_short_chapter_outliers(chapter_blocks, stddev_factor=2.0):
+    lengths = [sum(len(s) for s in chapter) for chapter in chapter_blocks]
+    if len(lengths) < 2:
+        return chapter_blocks
+    mean = statistics.mean(lengths)
+    stdev = statistics.stdev(lengths)
+    cutoff = mean - stddev_factor * stdev
+    return [chapter for chapter, length in zip(chapter_blocks, lengths) if length >= cutoff]
 
 def convert_ebook_batch(args, ctx):
     global context
@@ -1862,6 +1872,8 @@ def convert_ebook(args, ctx=None):
                             session['cover'] = get_cover(epubBook, session)
                             if session['cover']:
                                 session['toc'], session['chapters'] = get_chapters(epubBook, session)
+                                # Filter out unusually short chapter blocks
+                                session['chapters'] = filter_short_chapter_outliers(session['chapters'], stddev_factor=2.0)
                                 session['final_name'] = get_sanitized(session['metadata']['title'] + '.' + session['output_format'])
                                 if session['chapters'] is not None:
                                     if convert_chapters2audio(session):
