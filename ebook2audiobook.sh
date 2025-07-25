@@ -308,7 +308,7 @@ else
 
 	if [ "$SCRIPT_MODE" = "$FULL_DOCKER" ] || [ "$SCRIPT_MODE" = "$NATIVE" ]; then
 		pass=true
-		if [ "$SCRIPT_MODE" = "$NATIVE" ]; then		   
+		if [ "$SCRIPT_MODE" = "$FULL_DOCKER" ] || [ "$SCRIPT_MODE" = "$NATIVE" ]; then		   
 			if ! required_programs_check "${REQUIRED_PROGRAMS[@]}"; then
 				if ! install_programs; then
 					pass=false
