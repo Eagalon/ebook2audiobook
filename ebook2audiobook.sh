@@ -82,10 +82,15 @@ if [[ -n "$container" || -f /.dockerenv ]]; then
 	SCRIPT_MODE="$FULL_DOCKER"
 else
 	if [[ -n "${arguments['script_mode']+exists}" ]]; then
-		if [ "${arguments['script_mode']}" = "$NATIVE" ]; then
-			SCRIPT_MODE="${arguments['script_mode']}"
-		fi
+	    if [[ "${arguments['script_mode']}" = "$NATIVE" || "${arguments['script_mode']}" = "$FULL_DOCKER" ]]; then
+	        SCRIPT_MODE="${arguments['script_mode']}"
+	    else
+	        echo "Invalid --script_mode value: ${arguments['script_mode']}"
+	        exit 1
+	    fi
 	fi
+
+
 fi
 
 if [[ -n "${arguments['help']+exists}" && ${arguments['help']} = true ]]; then
