@@ -116,7 +116,7 @@ ARG SKIP_XTTS_TEST="false"
 #    else \
 #        echo "Skipping XTTS test run as requested."; \
 #    fi
-
+RUN ./ebook2audiobook.sh --headless --ebook tools/workflow-testing/test1.txt
 # Expose the required port
 EXPOSE 7860
 # Start the Gradio app with the required flag
