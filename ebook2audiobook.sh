@@ -301,11 +301,7 @@ else
 		return 0
 	}
 
-	if [ "$SCRIPT_MODE" = "$FULL_DOCKER" ]; then
-		python app.py --script_mode "$SCRIPT_MODE" "${ARGS[@]}"
-		conda deactivate
-		conda deactivate
-	elif [ "$SCRIPT_MODE" = "$NATIVE" ]; then
+	if [ "$SCRIPT_MODE" = "$FULL_DOCKER" ] || [ "$SCRIPT_MODE" = "$NATIVE" ]; then
 		pass=true
 		if [ "$SCRIPT_MODE" = "$NATIVE" ]; then		   
 			if ! required_programs_check "${REQUIRED_PROGRAMS[@]}"; then
