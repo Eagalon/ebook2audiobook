@@ -166,6 +166,7 @@ else
 	 			REQUIRED_PROGRAMS=("${REQUIRED_PROGRAMS[@]}" "${DOCKER_REQUIRED_PROGRAMS[@]}")
 	 		else
 				SUDO="sudo"
+    			fi
 			echo -e "\e[33mInstalling required programs. NOTE: you must have 'sudo' priviliges to install ebook2audiobook.\e[0m"
 			PACK_MGR_OPTIONS=""
 			if command -v emerge &> /dev/null; then
