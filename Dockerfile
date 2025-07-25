@@ -3,7 +3,7 @@ ARG BASE_IMAGE=base
 FROM ${BASE} AS base
 
 # Set environment PATH for local installations
-ENV PATH="/root/.local/bin:$PATH"
+#ENV PATH="/root/.local/bin:$PATH"
 # Set non-interactive mode to prevent tzdata prompt
 #ENV DEBIAN_FRONTEND=noninteractive
 # Install system packages
