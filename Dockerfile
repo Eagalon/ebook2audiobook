@@ -116,12 +116,12 @@ ARG SKIP_XTTS_TEST="false"
 #    else \
 #        echo "Skipping XTTS test run as requested."; \
 #    fi
-RUN ./ebook2audiobook.sh --headless --ebook tools/workflow-testing/test1.txt
+RUN bash ./ebook2audiobook.sh --headless --ebook tools/workflow-testing/test1.txt
 # Expose the required port
 EXPOSE 7860
 # Start the Gradio app with the required flag
 #ENTRYPOINT ["python", "app.py", "--script_mode", "full_docker"]
-ENTRYPOINT ["./ebook2audiobook.sh"]
+ENTRYPOINT ["bash" "./ebook2audiobook.sh"]
 
 #docker build --pull --build-arg BASE_IMAGE=athomasson2/ebook2audiobook:latest -t your-image-name .
 #The --pull flag forces Docker to always try to pull the latest version of the image, even if it already exists locally.
