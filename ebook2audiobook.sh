@@ -49,6 +49,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 WGET=$(which wget 2>/dev/null)
 REQUIRED_PROGRAMS=("curl" "calibre" "ffmpeg" "nodejs" "espeak-ng" "rust" "sox")
+DOCKER_REQUIRED_PROGRAMS=("gcc" "g++" "make" "wget" "git" "libmecab-dev" "mecab" "mecab-ipadic-utf8" "libsndfile1-dev" "libc-dev")
 PYTHON_ENV="python_env"
 CURRENT_ENV=""
 
@@ -160,7 +161,11 @@ else
 					eval "$(/opt/homebrew/bin/brew shellenv)"
 				fi
 		else
-			SUDO="sudo"
+  			if [ "$SCRIPT_MODE" = "$FULL_DOCKER" ]; then
+     				SUDO=""
+	 			REQUIRED_PROGRAMS=("${REQUIRED_PROGRAMS[@]}" "${DOCKER_REQUIRED_PROGRAMS[@]}")
+	 		else
+				SUDO="sudo"
 			echo -e "\e[33mInstalling required programs. NOTE: you must have 'sudo' priviliges to install ebook2audiobook.\e[0m"
 			PACK_MGR_OPTIONS=""
 			if command -v emerge &> /dev/null; then
