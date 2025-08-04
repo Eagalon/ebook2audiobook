@@ -185,14 +185,33 @@ class Coqui:
                         hf_repo = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
                         
                         try:
+                            # Map voice names to their subdirectory paths in rhasspy/piper-voices
+                            voice_paths = {
+                                'en_US-lessac-medium': 'en/en_US/lessac/medium',
+                                'en_US-amy-medium': 'en/en_US/amy/medium',
+                                'en_GB-alba-medium': 'en/en_GB/alba/medium',
+                                'en_GB-aru-medium': 'en/en_GB/aru/medium',
+                                'de_DE-thorsten-medium': 'de/de_DE/thorsten/medium',
+                                'fr_FR-upmc-medium': 'fr/fr_FR/upmc/medium',
+                                'es_ES-davefx-medium': 'es/es_ES/davefx/medium',
+                                'it_IT-riccardo-x_low': 'it/it_IT/riccardo-x_low/x_low',
+                                'pt_BR-edresson-low': 'pt/pt_BR/edresson/low'
+                            }
+                            
+                            if voice_name not in voice_paths:
+                                print(f"Unknown voice model: {voice_name}, using default")
+                                voice_name = 'en_US-lessac-medium'
+                            
+                            voice_path = voice_paths[voice_name]
+                            
                             model_file = hf_hub_download(
                                 repo_id=hf_repo,
-                                filename=f"{voice_name}.onnx",
+                                filename=f"{voice_path}/{voice_name}.onnx",
                                 cache_dir=self.cache_dir
                             )
                             config_file = hf_hub_download(
                                 repo_id=hf_repo,
-                                filename=f"{voice_name}.onnx.json",
+                                filename=f"{voice_path}/{voice_name}.onnx.json",
                                 cache_dir=self.cache_dir
                             )
                             tts = self._load_piper_voice(model_file, config_file)

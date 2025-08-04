@@ -167,9 +167,9 @@ default_engine_settings = {
             "fr_FR-upmc-medium": "UPMC (French, medium)",
             "es_ES-davefx-medium": "Davefx (Spanish, medium)",
             "it_IT-riccardo-x_low": "Riccardo (Italian, x_low)",
-            "pt_BR-edresson-low": "Edresson (Portuguese BR, low)"
+            "pt_BR-edresson-low": "Edresson (Portuguese Brazil, low)"
         },
-        "rating": {"GPU VRAM": 1, "CPU": 5, "RAM": 2, "Realism": 3}
+        "rating": {"GPU VRAM": 1, "CPU": 5, "RAM": 2, "Realism": 4}
     }
 }
 models = {
