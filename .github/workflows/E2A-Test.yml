@@ -112,9 +112,20 @@ jobs:
       
             # Merge PR source
             if ! git merge --no-ff --no-edit "origin/$HEAD_REF"; then
-              echo "❌ Merge conflict simulating PR merge"
-              exit 1
+              echo "❌ Initial merge failed, attempting cleanup of __pycache__ and retry..."
+            
+              # Remove known __pycache__ dirs that may cause conflict
+              rm -rf lib/__pycache__ \
+                     lib/classes/__pycache__ \
+                     lib/classes/tts_engines/common/__pycache__
+            
+              # Retry the merge
+              if ! git merge --no-ff --no-edit "origin/$HEAD_REF"; then
+                echo "❌ Merge still failed after cleanup"
+                exit 1
+              fi
             fi
+            
           else
             echo "==> Not a PR: checking out triggered commit directly"
             git fetch origin "$TRIGGER_SHA"
