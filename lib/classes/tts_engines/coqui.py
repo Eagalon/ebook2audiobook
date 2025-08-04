@@ -365,12 +365,20 @@ class Coqui:
                 temp_wav_path = temp_wav.name
             
             try:
+                print(f"Attempting Piper synthesis for text: '{text[:50]}...'")
+                print(f"Using temporary WAV file: {temp_wav_path}")
+                
                 # Synthesize audio to temporary WAV file
                 with open(temp_wav_path, 'wb') as wav_file:
+                    print("Calling voice.synthesize...")
                     voice.synthesize(text, wav_file)
+                    print("voice.synthesize completed")
                 
                 # Check if file has audio data
-                if not os.path.exists(temp_wav_path) or os.path.getsize(temp_wav_path) == 0:
+                file_size = os.path.getsize(temp_wav_path) if os.path.exists(temp_wav_path) else 0
+                print(f"Generated WAV file size: {file_size} bytes")
+                
+                if not os.path.exists(temp_wav_path) or file_size == 0:
                     error = f'No audio data was generated for text: "{text[:50]}..."'
                     print(error)
                     return None
@@ -382,6 +390,8 @@ class Coqui:
                     sample_rate = wav_file.getframerate()
                     sample_width = wav_file.getsampwidth()
                     channels = wav_file.getnchannels()
+                    
+                    print(f"WAV file parameters - frames: {frames}, sample_rate: {sample_rate}, sample_width: {sample_width}, channels: {channels}")
                     
                     if frames == 0:
                         error = 'Generated WAV file contains no audio frames'
@@ -421,6 +431,7 @@ class Coqui:
                     print(error)
                     return None
                 
+                print(f"Successfully synthesized audio array with {audio_array.size} samples")
                 return audio_array
                 
             finally:
