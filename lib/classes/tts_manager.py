@@ -10,12 +10,8 @@ class TTSManager:
  
     def _build(self):
         if self.session['tts_engine'] in TTS_ENGINES.values():
-            if self.session['tts_engine'] == TTS_ENGINES['PIPER']:
-                from lib.classes.tts_engines.piper import Piper
-                self.tts = Piper(self.session)
-            else:
-                from lib.classes.tts_engines.coqui import Coqui
-                self.tts = Coqui(self.session)
+            from lib.classes.tts_engines.coqui import Coqui
+            self.tts = Coqui(self.session)
             
             if self.tts:
                 return True
