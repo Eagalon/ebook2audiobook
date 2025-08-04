@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - main
+      - v25
     types:
       - opened
       - synchronize
@@ -151,6 +152,20 @@ jobs:
           source "$(conda info --base)/etc/profile.d/conda.sh"
           conda deactivate
           sed -i '' '1s;^;set -e\n;' ebook2audiobook.sh
+
+      - name: English PIPER headless single test
+        shell: bash
+        run: |
+          echo "Running English PIPER headless single test..."
+          cd ~/ebook2audiobook
+          source "$(conda info --base)/etc/profile.d/conda.sh"
+          conda deactivate
+          ./ebook2audiobook.sh --headless  --language eng --ebook "tools/workflow-testing/test1.txt" --tts_engine PIPER --output_dir ~/ebook2audiobook/audiobooks/PIPER
+          ./ebook2audiobook.sh --headless  --language eng --ebook "tools/workflow-testing/test1.txt" --tts_engine PIPER --voice_model "en_US-lessac-medium" --output_dir ~/ebook2audiobook/audiobooks/PIPER
+          echo "Testing PIPER Multi-language support"
+          ./ebook2audiobook.sh --headless  --language fra --ebook "tools/workflow-testing/test1.txt" --tts_engine PIPER --output_dir ~/ebook2audiobook/audiobooks/PIPER
+          ./ebook2audiobook.sh --headless  --language fra --ebook "tools/workflow-testing/test1.txt" --tts_engine PIPER --voice_model "fr_FR-upmc-medium" --output_dir ~/ebook2audiobook/audiobooks/PIPER
+
 
       - name: English TACOTRON2 Custom-Voice headless single test
         shell: bash
