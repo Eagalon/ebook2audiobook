@@ -344,39 +344,62 @@ class Coqui:
     def _synthesize_with_piper(self, voice, text):
         """Synthesize audio using Piper voice"""
         try:
-            import wave
             import io
             
-            # Use BytesIO buffer instead of temporary file
+            # Validate inputs
+            if not voice:
+                error = 'Piper voice is None'
+                print(error)
+                return None
+                
+            if not text or not text.strip():
+                error = 'Text is empty or None'
+                print(error)
+                return None
+            
+            # Use BytesIO buffer for raw audio data
             audio_buffer = io.BytesIO()
             
-            # Get voice config for audio parameters
-            sample_rate = voice.config.sample_rate if hasattr(voice.config, 'sample_rate') else 22050
+            # Perform synthesis - Piper writes raw PCM audio data
+            voice.synthesize(text, audio_buffer)
             
-            # Synthesize audio directly to buffer
-            with wave.open(audio_buffer, 'wb') as wav_file:
-                wav_file.setnchannels(1)  # Mono
-                wav_file.setsampwidth(2)  # 16-bit
-                wav_file.setframerate(sample_rate)
-                voice.synthesize(text, wav_file)
+            # Check if any data was written to buffer
+            if audio_buffer.tell() == 0:
+                error = f'No audio data was generated for text: "{text[:50]}..."'
+                print(error)
+                return None
             
             # Reset buffer position to read from beginning
             audio_buffer.seek(0)
             
-            # Read the audio data back using torchaudio
-            audio_tensor, loaded_sample_rate = torchaudio.load(audio_buffer, format='wav')
+            # Read the raw audio data
+            audio_data = audio_buffer.read()
             
-            # Convert to numpy array (mono)
-            if audio_tensor.shape[0] > 1:
-                audio_tensor = torch.mean(audio_tensor, dim=0)
-            else:
-                audio_tensor = audio_tensor.squeeze(0)
+            # Convert raw PCM bytes to numpy array
+            import numpy as np
+            # Piper outputs 16-bit signed PCM audio
+            audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
             
-            return audio_tensor.numpy()
+            # Normalize to [-1, 1] range 
+            audio_array = audio_array / 32768.0
             
+            # Validate the result
+            if audio_array.size == 0:
+                error = 'Final audio array is empty'
+                print(error)
+                return None
+                
+            return audio_array
+            
+        except ImportError as e:
+            error = f'Missing required module for Piper synthesis: {e}'
+            print(error)
+            return None
         except Exception as e:
             error = f'Error synthesizing with Piper: {e}'
             print(error)
+            import traceback
+            traceback.print_exc()
             return None
 
     def _check_xtts_builtin_speakers(self, voice_path, speaker, device):
@@ -918,6 +941,10 @@ class Coqui:
                     elif self.session['tts_engine'] == TTS_ENGINES['PIPER']:
                         # Generate audio using Piper
                         audio_sentence = self._synthesize_with_piper(tts, sentence)
+                        if not is_audio_data_valid(audio_sentence):
+                            error = 'Piper synthesis failed to generate valid audio'
+                            print(error)
+                            return False
                     if is_audio_data_valid(audio_sentence):
                         sourceTensor = self._tensor_type(audio_sentence)
                         audio_tensor = sourceTensor.clone().detach().unsqueeze(0).cpu()
