@@ -106,9 +106,10 @@ https://github.com/user-attachments/assets/81c4baad-117e-4db5-ac86-efc2b7fea921
 
 ## Features
 - 📚 Splits eBook into chapters for organized audio.
-- 🎙️ High-quality text-to-speech with [Coqui XTTSv2](https://huggingface.co/coqui/XTTS-v2) and [Fairseq](https://github.com/facebookresearch/fairseq/tree/main/examples/mms) (and more).
+- 🎙️ High-quality text-to-speech with [Coqui XTTSv2](https://huggingface.co/coqui/XTTS-v2), [Piper-TTS](https://github.com/OHF-Voice/piper1-gpl), and [Fairseq](https://github.com/facebookresearch/fairseq/tree/main/examples/mms) (and more).
 - 🗣️ Optional voice cloning with your own voice file.
 - 🌍 Supports +1110 languages (English by default). [List of Supported languages](https://dl.fbaipublicfiles.com/mms/tts/all-tts-languages.html)
+- ⚡ Fast CPU-optimized synthesis with Piper-TTS for rapid audiobook generation.
 - 🖥️ Designed to run on 4GB RAM.
 
 
@@ -240,7 +241,7 @@ to let the web page reconnect to the new connection socket.**
 usage: app.py [-h] [--session SESSION] [--share] [--headless] [--ebook EBOOK]
               [--ebooks_dir EBOOKS_DIR] [--language LANGUAGE] [--voice VOICE]
               [--device {cpu,gpu,mps}]
-              [--tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,xtts,bark,vits,fairseq,tacotron,yourtts}]
+              [--tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,PIPER,xtts,bark,vits,fairseq,tacotron,yourtts,piper}]
               [--custom_model CUSTOM_MODEL] [--fine_tuned FINE_TUNED]
               [--output_format OUTPUT_FORMAT] [--temperature TEMPERATURE]
               [--length_penalty LENGTH_PENALTY] [--num_beams NUM_BEAMS]
@@ -279,8 +280,8 @@ optional parameters:
   --device {cpu,gpu,mps}
                         (Optional) Pprocessor unit type for the conversion. 
                             Default is set in ./lib/conf.py if not present. Fall back to CPU if GPU not available.
-  --tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,xtts,bark,vits,fairseq,tacotron,yourtts}
-                        (Optional) Preferred TTS engine (available are: ['XTTSv2', 'BARK', 'VITS', 'FAIRSEQ', 'TACOTRON2', 'YOURTTS', 'xtts', 'bark', 'vits', 'fairseq', 'tacotron', 'yourtts'].
+  --tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,PIPER,xtts,bark,vits,fairseq,tacotron,yourtts,piper}
+                        (Optional) Preferred TTS engine (available are: ['XTTSv2', 'BARK', 'VITS', 'FAIRSEQ', 'TACOTRON2', 'YOURTTS', 'PIPER', 'xtts', 'bark', 'vits', 'fairseq', 'tacotron', 'yourtts', 'piper'].
                             Default depends on the selected language. The tts engine should be compatible with the chosen language
   --custom_model CUSTOM_MODEL
                         (Optional) Path to the custom model zip file cntaining mandatory model files. 
@@ -336,6 +337,50 @@ Linux/Mac:
 Tip: to add of silence (1.4 seconds) into your text just use "###" or "[pause]".
 
 ```
+
+### 🎯 Using Piper-TTS for Fast CPU Synthesis
+
+Piper-TTS is now integrated as a high-performance, CPU-optimized TTS engine that provides excellent quality with fast generation speeds. It's especially useful for users without powerful GPUs or those who want faster processing times.
+
+#### Available Piper Voices
+- **English**: `en_US-lessac-medium`, `en_US-amy-medium`, `en_GB-alba-medium`, `en_GB-aru-medium`
+- **German**: `de_DE-thorsten-medium`
+- **French**: `fr_FR-upmc-medium`
+- **Spanish**: `es_ES-davefx-medium`
+- **Italian**: `it_IT-riccardo-x_low`
+- **Portuguese**: `pt_BR-edresson-low`
+
+#### Usage Examples with Piper-TTS
+
+**Linux/Mac:**
+```bash
+# Basic Piper usage with default voice
+./ebook2audiobook.sh --headless --ebook "mybook.epub" --tts_engine PIPER
+
+# Use a specific Piper voice
+./ebook2audiobook.sh --headless --ebook "mybook.epub" --tts_engine PIPER --voice_model "en_US-lessac-medium"
+
+# German audiobook
+./ebook2audiobook.sh --headless --ebook "deutsches_buch.epub" --tts_engine PIPER --voice_model "de_DE-thorsten-medium" --language "de"
+```
+
+**Windows:**
+```cmd
+# Basic Piper usage
+ebook2audiobook.cmd --headless --ebook "mybook.epub" --tts_engine PIPER
+
+# Use a specific Piper voice
+ebook2audiobook.cmd --headless --ebook "mybook.epub" --tts_engine PIPER --voice_model "en_US-amy-medium"
+```
+
+#### Piper-TTS Benefits
+- ⚡ **Fast**: Optimized for CPU, much faster than GPU-based models on most systems
+- 💾 **Low Memory**: Requires only ~2GB RAM 
+- 🔄 **Auto-Download**: Voice models are automatically downloaded when first used
+- 🎯 **Quality**: High-quality synthesis comparable to other neural TTS systems
+- 🌐 **Multi-language**: Supports multiple languages with native-speaker quality
+
+> **Note**: The first time you use a Piper voice, the system will automatically download the model files (~20-50MB per voice). Subsequent uses will be instant.
 
 NOTE: in gradio/gui mode, to cancel a running conversion, just click on the [X] from the ebook upload component.
 
