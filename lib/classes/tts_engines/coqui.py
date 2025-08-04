@@ -380,14 +380,28 @@ class Coqui:
                         import numpy as np
                         audio_data = []
                         for chunk in audio_chunks:
-                            if chunk is not None and len(chunk) > 0:
-                                audio_data.extend(chunk)
+                            # AudioChunk objects have an 'audio' attribute containing the actual audio data
+                            if chunk is not None:
+                                if hasattr(chunk, 'audio') and chunk.audio is not None:
+                                    # Piper AudioChunk with .audio attribute
+                                    if hasattr(chunk.audio, '__len__') and len(chunk.audio) > 0:
+                                        audio_data.extend(chunk.audio)
+                                elif hasattr(chunk, '__iter__') and not isinstance(chunk, (str, bytes)):
+                                    # Handle raw audio data arrays
+                                    try:
+                                        audio_data.extend(chunk)
+                                    except TypeError:
+                                        # chunk might be a single value
+                                        audio_data.append(chunk)
+                                elif hasattr(chunk, '__len__') and len(chunk) > 0:
+                                    # Direct audio data
+                                    audio_data.extend(chunk)
                         
                         if len(audio_data) > 0:
                             # Convert to numpy array and write to WAV file
                             audio_array = np.array(audio_data, dtype=np.int16)
                             import soundfile as sf
-                            # Assume 22050 Hz sample rate (common for Piper)
+                            # Use Piper's sample rate (22050 Hz is standard for Piper)
                             sf.write(temp_wav_path, audio_array, 22050)
                             print(f"Successfully wrote {len(audio_array)} samples to WAV file")
                         else:
