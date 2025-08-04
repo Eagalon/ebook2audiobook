@@ -345,6 +345,9 @@ class Coqui:
         """Synthesize audio using Piper voice"""
         try:
             import io
+            import wave
+            import tempfile
+            import os
             
             # Validate inputs
             if not voice:
@@ -357,39 +360,73 @@ class Coqui:
                 print(error)
                 return None
             
-            # Use BytesIO buffer for raw audio data
-            audio_buffer = io.BytesIO()
+            # Create a temporary WAV file for Piper output
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                temp_wav_path = temp_wav.name
             
-            # Perform synthesis - Piper writes raw PCM audio data
-            voice.synthesize(text, audio_buffer)
-            
-            # Check if any data was written to buffer
-            if audio_buffer.tell() == 0:
-                error = f'No audio data was generated for text: "{text[:50]}..."'
-                print(error)
-                return None
-            
-            # Reset buffer position to read from beginning
-            audio_buffer.seek(0)
-            
-            # Read the raw audio data
-            audio_data = audio_buffer.read()
-            
-            # Convert raw PCM bytes to numpy array
-            import numpy as np
-            # Piper outputs 16-bit signed PCM audio
-            audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
-            
-            # Normalize to [-1, 1] range 
-            audio_array = audio_array / 32768.0
-            
-            # Validate the result
-            if audio_array.size == 0:
-                error = 'Final audio array is empty'
-                print(error)
-                return None
+            try:
+                # Synthesize audio to temporary WAV file
+                with open(temp_wav_path, 'wb') as wav_file:
+                    voice.synthesize(text, wav_file)
                 
-            return audio_array
+                # Check if file has audio data
+                if not os.path.exists(temp_wav_path) or os.path.getsize(temp_wav_path) == 0:
+                    error = f'No audio data was generated for text: "{text[:50]}..."'
+                    print(error)
+                    return None
+                
+                # Read the WAV file and extract audio data
+                with wave.open(temp_wav_path, 'rb') as wav_file:
+                    # Get audio parameters
+                    frames = wav_file.getnframes()
+                    sample_rate = wav_file.getframerate()
+                    sample_width = wav_file.getsampwidth()
+                    channels = wav_file.getnchannels()
+                    
+                    if frames == 0:
+                        error = 'Generated WAV file contains no audio frames'
+                        print(error)
+                        return None
+                    
+                    # Read the raw audio data
+                    audio_data = wav_file.readframes(frames)
+                
+                # Convert raw audio data to numpy array
+                import numpy as np
+                
+                if sample_width == 1:
+                    # 8-bit audio
+                    audio_array = np.frombuffer(audio_data, dtype=np.uint8).astype(np.float32)
+                    audio_array = (audio_array - 128.0) / 128.0
+                elif sample_width == 2:
+                    # 16-bit audio (most common for Piper)
+                    audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
+                    audio_array = audio_array / 32768.0
+                elif sample_width == 4:
+                    # 32-bit audio
+                    audio_array = np.frombuffer(audio_data, dtype=np.int32).astype(np.float32)
+                    audio_array = audio_array / 2147483648.0
+                else:
+                    error = f'Unsupported sample width: {sample_width}'
+                    print(error)
+                    return None
+                
+                # Handle multi-channel audio by taking only the first channel
+                if channels > 1:
+                    audio_array = audio_array.reshape(-1, channels)[:, 0]
+                
+                # Validate the result
+                if audio_array.size == 0:
+                    error = 'Final audio array is empty'
+                    print(error)
+                    return None
+                
+                return audio_array
+                
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_wav_path):
+                    os.unlink(temp_wav_path)
             
         except ImportError as e:
             error = f'Missing required module for Piper synthesis: {e}'
