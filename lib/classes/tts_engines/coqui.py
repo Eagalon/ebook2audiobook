@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import threading
 import uuid
+import wave
 
 import numpy as np
 import regex as re
@@ -999,10 +1000,6 @@ class Coqui:
                     elif self.session['tts_engine'] == TTS_ENGINES['PIPER']:
                         # Generate audio using Piper following template pattern
                         try:
-                            import numpy as np
-                            import tempfile
-                            import wave
-                            import os
                             
                             # Create a temporary WAV file for Piper output
                             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
