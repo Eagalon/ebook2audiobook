@@ -157,67 +157,12 @@ class Coqui:
                         tts = self._load_api(self.tts_key, model_path, self.session['device'])
                 elif self.session['tts_engine'] == TTS_ENGINES['PIPER']:
                     if self.session['custom_model'] is not None:
-                        # Custom model support - load from custom directory
-                        model_dir = os.path.join(self.session['custom_model_dir'], self.session['tts_engine'], self.session['custom_model'])
-                        model_file = None
-                        config_file = None
-                        
-                        # Find .onnx and .onnx.json files in the custom model directory
-                        for file in os.listdir(model_dir):
-                            if file.endswith('.onnx'):
-                                model_file = os.path.join(model_dir, file)
-                            elif file.endswith('.onnx.json'):
-                                config_file = os.path.join(model_dir, file)
-                        
-                        if not model_file or not config_file:
-                            print(f"Piper model files not found in {model_dir}")
-                            return False
-                        
-                        self.tts_key = f"{self.session['tts_engine']}-{self.session['custom_model']}"
-                        tts = self._load_piper_voice(model_file, config_file)
+                        msg = f"{self.session['tts_engine']} custom model not implemented yet!"
+                        print(msg)
+                        return False
                     else:
-                        # Use default voice model
-                        voice_name = self.session.get('voice_model', 'en_US-lessac-medium')
-                        if voice_name not in default_engine_settings[TTS_ENGINES['PIPER']]['voices']:
-                            voice_name = 'en_US-lessac-medium'  # fallback
-                        
-                        # Download model files if needed
-                        hf_repo = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
-                        
-                        try:
-                            # Map voice names to their subdirectory paths in rhasspy/piper-voices
-                            voice_paths = {
-                                'en_US-lessac-medium': 'en/en_US/lessac/medium',
-                                'en_US-amy-medium': 'en/en_US/amy/medium',
-                                'en_GB-alba-medium': 'en/en_GB/alba/medium',
-                                'en_GB-aru-medium': 'en/en_GB/aru/medium',
-                                'de_DE-thorsten-medium': 'de/de_DE/thorsten/medium',
-                                'fr_FR-upmc-medium': 'fr/fr_FR/upmc/medium',
-                                'es_ES-davefx-medium': 'es/es_ES/davefx/medium',
-                                'it_IT-riccardo-x_low': 'it/it_IT/riccardo-x_low/x_low',
-                                'pt_BR-edresson-low': 'pt/pt_BR/edresson/low'
-                            }
-                            
-                            if voice_name not in voice_paths:
-                                print(f"Unknown voice model: {voice_name}, using default")
-                                voice_name = 'en_US-lessac-medium'
-                            
-                            voice_path = voice_paths[voice_name]
-                            
-                            model_file = hf_hub_download(
-                                repo_id=hf_repo,
-                                filename=f"{voice_path}/{voice_name}.onnx",
-                                cache_dir=self.cache_dir
-                            )
-                            config_file = hf_hub_download(
-                                repo_id=hf_repo,
-                                filename=f"{voice_path}/{voice_name}.onnx.json",
-                                cache_dir=self.cache_dir
-                            )
-                            tts = self._load_piper_voice(model_file, config_file)
-                        except Exception as e:
-                            print(f"Failed to download Piper model {voice_name}: {e}")
-                            return False
+                        model_path = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
+                        tts = self._load_api(self.tts_key, model_path, self.session['device'])
             if load_zeroshot:
                 tts_vc = (loaded_tts.get(self.tts_vc_key) or {}).get('engine', False)
                 if not tts_vc:
@@ -237,14 +182,57 @@ class Coqui:
             if key in loaded_tts.keys():
                 return loaded_tts[key]['engine']
             unload_tts(device, [self.tts_key, self.tts_vc_key])
-            from TTS.api import TTS as coquiAPI
             with lock:
-                tts = coquiAPI(model_path)
+                if self.session['tts_engine'] == TTS_ENGINES['PIPER']:
+                    from piper import PiperVoice
+                    
+                    # Get voice model name from session or use default
+                    voice_name = self.session.get('voice_model', 'en_US-lessac-medium')
+                    if voice_name not in default_engine_settings[TTS_ENGINES['PIPER']]['voices']:
+                        voice_name = 'en_US-lessac-medium'  # fallback
+                    
+                    # Map voice names to their subdirectory paths in rhasspy/piper-voices
+                    voice_paths = {
+                        'en_US-lessac-medium': 'en/en_US/lessac/medium',
+                        'en_US-amy-medium': 'en/en_US/amy/medium',
+                        'en_GB-alba-medium': 'en/en_GB/alba/medium',
+                        'en_GB-aru-medium': 'en/en_GB/aru/medium',
+                        'de_DE-thorsten-medium': 'de/de_DE/thorsten/medium',
+                        'fr_FR-upmc-medium': 'fr/fr_FR/upmc/medium',
+                        'es_ES-davefx-medium': 'es/es_ES/davefx/medium',
+                        'it_IT-riccardo-x_low': 'it/it_IT/riccardo-x_low/x_low',
+                        'pt_BR-edresson-low': 'pt/pt_BR/edresson/low'
+                    }
+                    
+                    if voice_name not in voice_paths:
+                        print(f"Unknown voice model: {voice_name}, using default")
+                        voice_name = 'en_US-lessac-medium'
+                    
+                    voice_path = voice_paths[voice_name]
+                    
+                    model_file = hf_hub_download(
+                        repo_id=model_path,
+                        filename=f"{voice_path}/{voice_name}.onnx",
+                        cache_dir=self.cache_dir
+                    )
+                    config_file = hf_hub_download(
+                        repo_id=model_path,
+                        filename=f"{voice_path}/{voice_name}.onnx.json",
+                        cache_dir=self.cache_dir
+                    )
+                    
+                    use_cuda = device == 'cuda' and torch.cuda.is_available()
+                    tts = PiperVoice.load(model_file, config_path=config_file, use_cuda=use_cuda)
+                else:
+                    from TTS.api import TTS as coquiAPI
+                    tts = coquiAPI(model_path)
+                    
                 if tts:
-                    if device == 'cuda':
-                        tts.cuda()
-                    else:
-                        tts.to(device)
+                    if self.session['tts_engine'] != TTS_ENGINES['PIPER']:
+                        if device == 'cuda':
+                            tts.cuda()
+                        else:
+                            tts.to(device)
                     loaded_tts[key] = {"engine": tts, "config": None} 
                     msg = f'{model_path} Loaded!'
                     print(msg)
@@ -1037,12 +1025,63 @@ class Coqui:
                                 **speaker_argument
                             )
                     elif self.session['tts_engine'] == TTS_ENGINES['PIPER']:
-                        # Generate audio using Piper
-                        audio_sentence = self._synthesize_with_piper(tts, sentence)
-                        if not is_audio_data_valid(audio_sentence):
-                            error = 'Piper synthesis failed to generate valid audio'
+                        # Generate audio using Piper following template pattern
+                        try:
+                            import numpy as np
+                            import tempfile
+                            import wave
+                            import os
+                            
+                            # Create a temporary WAV file for Piper output
+                            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                                temp_wav_path = temp_wav.name
+                            
+                            try:
+                                # Use Piper's synthesize method to generate audio directly to file
+                                with open(temp_wav_path, 'wb') as wav_file:
+                                    tts.synthesize(sentence, wav_file)
+                                
+                                # Read the WAV file and extract audio data
+                                with wave.open(temp_wav_path, 'rb') as wav_file:
+                                    frames = wav_file.getnframes()
+                                    sample_rate = wav_file.getframerate()
+                                    sample_width = wav_file.getsampwidth()
+                                    channels = wav_file.getnchannels()
+                                    
+                                    if frames == 0:
+                                        error = 'Generated WAV file contains no audio frames'
+                                        print(error)
+                                        audio_sentence = None
+                                    else:
+                                        # Read the raw audio data
+                                        audio_data = wav_file.readframes(frames)
+                                        
+                                        # Convert raw audio data to numpy array
+                                        if sample_width == 2:
+                                            # 16-bit audio (most common for Piper)
+                                            audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
+                                            audio_array = audio_array / 32768.0
+                                        else:
+                                            error = f'Unsupported sample width: {sample_width}'
+                                            print(error)
+                                            audio_sentence = None
+                                            
+                                        if audio_array is not None:
+                                            # Handle multi-channel audio by taking only the first channel
+                                            if channels > 1:
+                                                audio_array = audio_array.reshape(-1, channels)[:, 0]
+                                            
+                                            audio_sentence = audio_array
+                                            
+                            finally:
+                                # Clean up temporary file
+                                if os.path.exists(temp_wav_path):
+                                    os.unlink(temp_wav_path)
+                                    
+                        except Exception as e:
+                            error = f'Error synthesizing with Piper: {e}'
                             print(error)
-                            return False
+                            audio_sentence = None
                     if is_audio_data_valid(audio_sentence):
                         sourceTensor = self._tensor_type(audio_sentence)
                         audio_tensor = sourceTensor.clone().detach().unsqueeze(0).cpu()
