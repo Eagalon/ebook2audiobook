@@ -116,7 +116,7 @@ jobs:
             
               # Remove known __pycache__ dirs that may cause conflict
               echo "==> Cleaning up untracked files like __pycache__"
-              git clean -fdX lib/
+              git clean -ffd lib/
             
               # Retry the merge
               if ! git merge --no-ff --no-edit "origin/$HEAD_REF"; then
