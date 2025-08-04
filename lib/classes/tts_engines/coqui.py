@@ -369,10 +369,34 @@ class Coqui:
                 print(f"Using temporary WAV file: {temp_wav_path}")
                 
                 # Synthesize audio to temporary WAV file
-                with open(temp_wav_path, 'wb') as wav_file:
+                try:
                     print("Calling voice.synthesize...")
-                    voice.synthesize(text, wav_file)
-                    print("voice.synthesize completed")
+                    
+                    # Try different approaches based on Piper API
+                    # First try: Direct synthesis to file path
+                    audio_data = voice.synthesize(text)
+                    
+                    if audio_data is not None and len(audio_data) > 0:
+                        # Write audio data to WAV file
+                        import soundfile as sf
+                        sf.write(temp_wav_path, audio_data['audio'], audio_data['sample_rate'])
+                        print(f"Successfully wrote {len(audio_data['audio'])} samples to WAV file")
+                    else:
+                        print("No audio data returned from voice.synthesize")
+                        return None
+                        
+                except Exception as synthesis_error:
+                    print(f"First synthesis approach failed: {synthesis_error}")
+                    # Second try: Original approach with file handle
+                    try:
+                        with open(temp_wav_path, 'wb') as wav_file:
+                            voice.synthesize(text, wav_file)
+                        print("Fallback synthesis approach completed")
+                    except Exception as fallback_error:
+                        print(f"Fallback synthesis also failed: {fallback_error}")
+                        return None
+                
+                print("voice.synthesize completed")
                 
                 # Check if file has audio data
                 file_size = os.path.getsize(temp_wav_path) if os.path.exists(temp_wav_path) else 0
