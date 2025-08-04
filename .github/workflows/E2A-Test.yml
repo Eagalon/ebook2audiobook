@@ -115,9 +115,8 @@ jobs:
               echo "❌ Initial merge failed, attempting cleanup of __pycache__ and retry..."
             
               # Remove known __pycache__ dirs that may cause conflict
-              rm -rf lib/__pycache__ \
-                     lib/classes/__pycache__ \
-                     lib/classes/tts_engines/common/__pycache__
+              echo "==> Cleaning up untracked files like __pycache__"
+              git clean -fdX lib/
             
               # Retry the merge
               if ! git merge --no-ff --no-edit "origin/$HEAD_REF"; then
