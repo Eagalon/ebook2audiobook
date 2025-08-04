@@ -372,21 +372,33 @@ class Coqui:
                 try:
                     print("Calling voice.synthesize...")
                     
-                    # Try different approaches based on Piper API
-                    # First try: Direct synthesis to file path
-                    audio_data = voice.synthesize(text)
+                    # Try generator approach - Piper returns a generator of audio chunks
+                    audio_chunks = voice.synthesize(text)
                     
-                    if audio_data is not None and len(audio_data) > 0:
-                        # Write audio data to WAV file
-                        import soundfile as sf
-                        sf.write(temp_wav_path, audio_data['audio'], audio_data['sample_rate'])
-                        print(f"Successfully wrote {len(audio_data['audio'])} samples to WAV file")
+                    if audio_chunks is not None:
+                        # Collect all audio chunks into a single array
+                        import numpy as np
+                        audio_data = []
+                        for chunk in audio_chunks:
+                            if chunk is not None and len(chunk) > 0:
+                                audio_data.extend(chunk)
+                        
+                        if len(audio_data) > 0:
+                            # Convert to numpy array and write to WAV file
+                            audio_array = np.array(audio_data, dtype=np.int16)
+                            import soundfile as sf
+                            # Assume 22050 Hz sample rate (common for Piper)
+                            sf.write(temp_wav_path, audio_array, 22050)
+                            print(f"Successfully wrote {len(audio_array)} samples to WAV file")
+                        else:
+                            print("No audio data in generator chunks")
+                            return None
                     else:
-                        print("No audio data returned from voice.synthesize")
+                        print("No audio chunks returned from voice.synthesize")
                         return None
                         
                 except Exception as synthesis_error:
-                    print(f"First synthesis approach failed: {synthesis_error}")
+                    print(f"Generator synthesis approach failed: {synthesis_error}")
                     # Second try: Original approach with file handle
                     try:
                         with open(temp_wav_path, 'wb') as wav_file:
