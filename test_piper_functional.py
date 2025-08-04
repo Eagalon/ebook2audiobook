@@ -8,8 +8,8 @@ import sys
 import os
 import tempfile
 
-# Add the lib directory to Python path for importing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
+# Add the current directory to Python path for importing
+sys.path.insert(0, os.path.dirname(__file__))
 
 def test_piper_conversion_flow():
     """Test the complete piper-tts conversion flow without actual file I/O"""
@@ -18,8 +18,8 @@ def test_piper_conversion_flow():
     
     try:
         # Import required modules
-        from models import TTS_ENGINES, default_engine_settings, models
-        from classes.tts_manager import TTSManager
+        from lib.models import TTS_ENGINES, default_engine_settings, models
+        from lib.classes.tts_manager import TTSManager
         
         print("✅ Required modules imported successfully")
         

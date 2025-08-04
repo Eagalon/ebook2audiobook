@@ -7,8 +7,8 @@ This script shows the configuration is working without requiring model downloads
 import sys
 import os
 
-# Add the lib directory to Python path for importing
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
+# Add the current directory to Python path for importing
+sys.path.insert(0, os.path.dirname(__file__))
 
 def demonstrate_piper_integration():
     """Demonstrate that piper-tts is properly integrated"""
@@ -17,7 +17,7 @@ def demonstrate_piper_integration():
     
     try:
         # Import and show TTS engines
-        from models import TTS_ENGINES, default_engine_settings, models
+        from lib.models import TTS_ENGINES, default_engine_settings, models
         print("📋 Available TTS Engines:")
         for name, engine_id in TTS_ENGINES.items():
             marker = "🆕" if name == "PIPER" else "  "
