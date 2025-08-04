@@ -301,34 +301,6 @@ class Coqui:
             error = f'_load_checkpoint() error: {e}'
         return False
 
-    def _load_piper_voice(self, model_file, config_file):
-        """Load a Piper voice from model and config files"""
-        try:
-            from piper import PiperVoice
-            
-            use_cuda = self.session['device'] == 'gpu' and torch.cuda.is_available()
-            voice = PiperVoice.load(model_file, config_path=config_file, use_cuda=use_cuda)
-            
-            if voice:
-                loaded_tts[self.tts_key] = {
-                    'engine': voice,
-                    'samplerate': self.params[self.session['tts_engine']]['samplerate']
-                }
-                print(f"Piper voice loaded successfully from {model_file}")
-                return voice
-            else:
-                error = 'Piper voice could not be created!'
-                print(error)
-        except ImportError:
-            error = 'piper-tts package not installed. Please install with: pip install piper-tts'
-            print(error)
-            return None
-        except Exception as e:
-            error = f'Error loading Piper voice: {e}'
-            print(error)
-            return None
-        return False
-
     def _synthesize_with_piper(self, voice, text):
         """Synthesize audio using Piper voice"""
         try:
