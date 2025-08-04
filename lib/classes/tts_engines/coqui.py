@@ -345,20 +345,26 @@ class Coqui:
         """Synthesize audio using Piper voice"""
         try:
             import wave
+            import io
             
-            # Create a temporary WAV file
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
-                temp_path = temp_file.name
-
-            # Synthesize audio to WAV file
-            with wave.open(temp_path, 'wb') as wav_file:
+            # Use BytesIO buffer instead of temporary file
+            audio_buffer = io.BytesIO()
+            
+            # Get voice config for audio parameters
+            sample_rate = voice.config.sample_rate if hasattr(voice.config, 'sample_rate') else 22050
+            
+            # Synthesize audio directly to buffer
+            with wave.open(audio_buffer, 'wb') as wav_file:
+                wav_file.setnchannels(1)  # Mono
+                wav_file.setsampwidth(2)  # 16-bit
+                wav_file.setframerate(sample_rate)
                 voice.synthesize(text, wav_file)
-
-            # Read the audio data back
-            audio_tensor, sample_rate = torchaudio.load(temp_path)
             
-            # Clean up temporary file
-            os.unlink(temp_path)
+            # Reset buffer position to read from beginning
+            audio_buffer.seek(0)
+            
+            # Read the audio data back using torchaudio
+            audio_tensor, loaded_sample_rate = torchaudio.load(audio_buffer, format='wav')
             
             # Convert to numpy array (mono)
             if audio_tensor.shape[0] > 1:
