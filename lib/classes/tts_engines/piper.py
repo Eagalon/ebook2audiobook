@@ -8,11 +8,8 @@ import torch
 import torchaudio
 
 from pathlib import Path
-from huggingface_hub import hf_hub_download
 
 from lib import *
-from lib.classes.tts_engines.common.utils import unload_tts, append_sentence2vtt
-from lib.classes.tts_engines.common.audio_filters import trim_audio, is_audio_data_valid
 
 lock = threading.Lock()
 
@@ -67,6 +64,7 @@ class Piper:
                     hf_repo = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
                     
                     try:
+                        from huggingface_hub import hf_hub_download
                         model_file = hf_hub_download(
                             repo_id=hf_repo,
                             filename=f"{voice_name}.onnx",
@@ -121,6 +119,10 @@ class Piper:
 
     def convert(self, sentence_number, sentence):
         try:
+            # Import needed functions when actually used
+            from lib.classes.tts_engines.common.utils import append_sentence2vtt
+            from lib.classes.tts_engines.common.audio_filters import trim_audio, is_audio_data_valid
+            
             settings = self.params[self.session['tts_engine']]
             final_sentence_file = os.path.join(self.session['chapters_dir_sentences'], f'{sentence_number}.{default_audio_proc_format}')
             sentence = sentence.strip()
