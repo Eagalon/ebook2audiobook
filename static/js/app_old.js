@@ -1,6 +1,6 @@
 /**
  * JavaScript for ebook2audiobook Flask interface
- * Handles file uploads, real-time updates, and user interactions
+ * Complete functionality to match original Gradio interface
  */
 
 class Ebook2AudiobookApp {
@@ -20,12 +20,14 @@ class Ebook2AudiobookApp {
         this.initSocketIO();
         this.setupEventListeners();
         
-        // Load data asynchronously but don't block initialization
+        // Load initial data
         Promise.allSettled([
             this.loadAvailableVoices(),
-            this.loadAvailableModels()
+            this.loadAvailableModels(),
+            this.loadTTSEngines(),
+            this.loadFineTunedModels(),
+            this.loadAudiobooks()
         ]).finally(() => {
-            // Always hide the glass mask after a short delay, regardless of loading success
             setTimeout(() => {
                 this.hideGlassMask();
             }, 500);
@@ -39,7 +41,6 @@ class Ebook2AudiobookApp {
     
     initSocketIO() {
         try {
-            // Check if Socket.IO is available
             if (typeof io === 'undefined') {
                 console.warn('Socket.IO not available, continuing without real-time updates');
                 return;
@@ -56,7 +57,6 @@ class Ebook2AudiobookApp {
             
             this.socket.on('connect_error', (error) => {
                 console.warn('Socket connection error:', error);
-                // Continue anyway - the interface can work without real-time updates
             });
             
             this.socket.on('conversion_start', (data) => {
@@ -76,7 +76,6 @@ class Ebook2AudiobookApp {
             });
         } catch (error) {
             console.error('Failed to initialize SocketIO:', error);
-            // Continue without socket - basic functionality will still work
         }
     }
     
@@ -90,6 +89,12 @@ class Ebook2AudiobookApp {
         const form = document.getElementById('conversionForm');
         if (form) {
             form.addEventListener('submit', this.handleFormSubmit.bind(this));
+        }
+        
+        // Convert button
+        const convertBtn = document.getElementById('convert_btn');
+        if (convertBtn) {
+            convertBtn.addEventListener('click', this.handleFormSubmit.bind(this));
         }
         
         // Input mode switching
@@ -118,8 +123,23 @@ class Ebook2AudiobookApp {
             ttsEngine.addEventListener('change', this.handleTTSEngineChange.bind(this));
         }
         
+        // Language change
+        const language = document.getElementById('language');
+        if (language) {
+            language.addEventListener('change', this.handleLanguageChange.bind(this));
+        }
+        
+        // Audiobook list selection
+        const audiobookList = document.getElementById('audiobook_list');
+        if (audiobookList) {
+            audiobookList.addEventListener('change', this.handleAudiobookSelection.bind(this));
+        }
+        
         // Parameter sliders
         this.setupParameterSliders();
+        
+        // Delete buttons
+        this.setupDeleteButtons();
     }
     
     setupFileUpload(inputId, fileType, callback) {
@@ -128,7 +148,7 @@ class Ebook2AudiobookApp {
                                                    fileType === 'voice' ? 'voice' : 'model'}_upload_area`);
         
         if (!input || !uploadArea) {
-            console.warn(`Missing elements for file upload: ${inputId}, uploadArea for ${fileType}`);
+            console.warn(`Missing elements for file upload: ${inputId}`);
             return;
         }
         
@@ -200,8 +220,8 @@ class Ebook2AudiobookApp {
             if (result.success) {
                 this.uploadedFiles.voice = result;
                 this.showFilePreview('voice', result.filename, file.size);
-                this.showVoicePreview(result.path);
-                this.showSuccess(`Voice file uploaded: ${result.filename}`);
+                this.showSuccess(`Voice file uploaded: ${result.voice_name}`);
+                this.loadAvailableVoices(); // Refresh voice list
             } else {
                 this.showError(result.error);
             }
@@ -225,7 +245,7 @@ class Ebook2AudiobookApp {
             if (result.success) {
                 this.uploadedFiles.customModel = result;
                 this.showFilePreview('model', result.filename, file.size);
-                this.showSuccess(`Custom model uploaded: ${result.filename}`);
+                this.showSuccess(`Custom model uploaded: ${result.model_name}`);
                 this.loadAvailableModels(); // Refresh model list
             } else {
                 this.showError(result.error);
@@ -275,23 +295,9 @@ class Ebook2AudiobookApp {
         }
     }
     
-    showVoicePreview(path) {
-        const preview = document.getElementById('voice_preview');
-        const source = document.getElementById('voice_audio_source');
-        source.src = '/preview/voice';
-        preview.classList.remove('d-none');
-    }
-    
     async loadAvailableVoices() {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-            
-            const response = await fetch('/api/voices', {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            
+            const response = await fetch('/api/voices');
             const result = await response.json();
             
             const select = document.getElementById('voice_list');
@@ -308,20 +314,12 @@ class Ebook2AudiobookApp {
             }
         } catch (error) {
             console.warn('Failed to load voices:', error);
-            // Don't show error to user - this is not critical for startup
         }
     }
     
     async loadAvailableModels() {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
-            const response = await fetch('/api/custom_models', {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            
+            const response = await fetch('/api/custom_models');
             const result = await response.json();
             
             const select = document.getElementById('custom_model_list');
@@ -336,6 +334,53 @@ class Ebook2AudiobookApp {
             }
         } catch (error) {
             console.warn('Failed to load custom models:', error);
+        }
+    }
+    
+    async loadTTSEngines() {
+        try {
+            const response = await fetch('/api/tts_engines');
+            const result = await response.json();
+            
+            const select = document.getElementById('tts_engine');
+            if (select && result.engines) {
+                select.innerHTML = '';
+                result.engines.forEach(engine => {
+                    const option = document.createElement('option');
+                    option.value = engine.value;
+                    option.textContent = engine.label;
+                    option.dataset.rating = JSON.stringify(engine.rating);
+                    select.appendChild(option);
+                });
+                
+                // Update rating display for first engine
+                if (result.engines.length > 0) {
+                    this.updateTTSRating(result.engines[0].rating);
+                    this.handleTTSEngineChange({target: {value: result.engines[0].value}});
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to load TTS engines:', error);
+        }
+    }
+    
+    async loadFineTunedModels() {
+        try {
+            const response = await fetch('/api/fine_tuned_models');
+            const result = await response.json();
+            
+            const select = document.getElementById('fine_tuned');
+            if (select && result.fine_tuned_models) {
+                select.innerHTML = '<option value="">Select preset...</option>';
+                result.fine_tuned_models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.value;
+                    option.textContent = model.label;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.warn('Failed to load fine-tuned models:', error);
         }
     }
     
@@ -365,50 +410,10 @@ class Ebook2AudiobookApp {
         }
     }
     
-    async loadTTSEngines() {
-        try {
-            const response = await fetch('/api/tts_engines');
-            const result = await response.json();
-            
-            const select = document.getElementById('tts_engine');
-            if (select && result.engines) {
-                select.innerHTML = '';
-                result.engines.forEach(engine => {
-                    const option = document.createElement('option');
-                    option.value = engine.value;
-                    option.textContent = engine.label;
-                    option.dataset.rating = JSON.stringify(engine.rating);
-                    select.appendChild(option);
-                });
-                
-                // Update rating display for first engine
-                if (result.engines.length > 0) {
-                    this.updateTTSRating(result.engines[0].rating);
-                }
-            }
-        } catch (error) {
-            console.warn('Failed to load TTS engines:', error);
-        }
-    }
-    
-    async loadFineTunedModels() {
-        try {
-            const response = await fetch('/api/fine_tuned_models');
-            const result = await response.json();
-            
-            const select = document.getElementById('fine_tuned');
-            if (select && result.fine_tuned_models) {
-                select.innerHTML = '<option value="">Select preset...</option>';
-                result.fine_tuned_models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.value;
-                    option.textContent = model.label;
-                    select.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.warn('Failed to load fine-tuned models:', error);
-        }
+    handleInputModeChange(e) {
+        const isDirectory = e.target.value === 'directory';
+        // Update UI for directory vs file mode
+        // This would be implemented based on the specific requirements
     }
     
     handleVoiceSelection(event) {
@@ -424,12 +429,13 @@ class Ebook2AudiobookApp {
             if (deleteBtn) {
                 const isBuiltin = selectedOption.dataset.builtin === 'true';
                 deleteBtn.classList.toggle('d-none', isBuiltin);
-                deleteBtn.onclick = () => this.deleteVoice(selectedPath);
             }
         } else {
             // Hide preview and delete button
-            document.getElementById('voice_preview').classList.add('d-none');
-            document.getElementById('voice_delete_btn').classList.add('d-none');
+            const preview = document.getElementById('voice_preview');
+            if (preview) preview.classList.add('d-none');
+            const deleteBtn = document.getElementById('voice_delete_btn');
+            if (deleteBtn) deleteBtn.classList.add('d-none');
         }
     }
     
@@ -439,8 +445,12 @@ class Ebook2AudiobookApp {
         const deleteBtn = document.getElementById('model_delete_btn');
         if (deleteBtn) {
             deleteBtn.classList.toggle('d-none', !selectedPath);
-            deleteBtn.onclick = () => this.deleteCustomModel(selectedPath);
         }
+    }
+    
+    handleLanguageChange(event) {
+        // Reload TTS engines for new language
+        this.loadTTSEngines();
     }
     
     handleTTSEngineChange(event) {
@@ -448,7 +458,7 @@ class Ebook2AudiobookApp {
         const selectedOption = event.target.options[event.target.selectedIndex];
         
         // Update rating display
-        if (selectedOption.dataset.rating) {
+        if (selectedOption && selectedOption.dataset.rating) {
             const rating = JSON.parse(selectedOption.dataset.rating);
             this.updateTTSRating(rating);
         }
@@ -458,6 +468,27 @@ class Ebook2AudiobookApp {
         
         // Show/hide parameter tabs based on engine
         this.updateParameterTabs(selectedEngine);
+    }
+    
+    handleAudiobookSelection(event) {
+        const selectedPath = event.target.value;
+        
+        if (selectedPath) {
+            // Show audiobook player
+            this.showAudiobookPlayer(selectedPath);
+            
+            // Show delete button
+            const deleteBtn = document.getElementById('audiobook_delete_btn');
+            if (deleteBtn) {
+                deleteBtn.classList.remove('d-none');
+            }
+        } else {
+            // Hide player and delete button
+            const player = document.getElementById('audiobook_player');
+            if (player) player.classList.add('d-none');
+            const deleteBtn = document.getElementById('audiobook_delete_btn');
+            if (deleteBtn) deleteBtn.classList.add('d-none');
+        }
     }
     
     updateTTSRating(rating) {
@@ -483,11 +514,65 @@ class Ebook2AudiobookApp {
         const barkTab = document.getElementById('bark-tab');
         
         if (xttsTab && barkTab) {
-            const isXTTS = engine.includes('XTTSv2');
-            const isBark = engine.includes('BARK');
+            const isXTTS = engine && engine.includes('XTTSv2');
+            const isBark = engine && engine.includes('BARK');
             
             xttsTab.style.display = isXTTS ? 'block' : 'none';
             barkTab.style.display = isBark ? 'block' : 'none';
+        }
+    }
+    
+    showVoicePreview(path) {
+        const preview = document.getElementById('voice_preview');
+        const source = document.getElementById('voice_audio_source');
+        if (preview && source) {
+            source.src = `/api/voices/${encodeURIComponent(path)}/preview`;
+            preview.classList.remove('d-none');
+        }
+    }
+    
+    showAudiobookPlayer(path) {
+        const player = document.getElementById('audiobook_player');
+        const source = document.getElementById('audiobook_audio_source');
+        if (player && source) {
+            source.src = `/api/audiobooks/${encodeURIComponent(path)}/preview`;
+            player.classList.remove('d-none');
+            player.load();
+        }
+    }
+    
+    setupDeleteButtons() {
+        // Voice delete button
+        const voiceDeleteBtn = document.getElementById('voice_delete_btn');
+        if (voiceDeleteBtn) {
+            voiceDeleteBtn.addEventListener('click', () => {
+                const voiceList = document.getElementById('voice_list');
+                if (voiceList && voiceList.value) {
+                    this.deleteVoice(voiceList.value);
+                }
+            });
+        }
+        
+        // Model delete button
+        const modelDeleteBtn = document.getElementById('model_delete_btn');
+        if (modelDeleteBtn) {
+            modelDeleteBtn.addEventListener('click', () => {
+                const modelList = document.getElementById('custom_model_list');
+                if (modelList && modelList.value) {
+                    this.deleteCustomModel(modelList.value);
+                }
+            });
+        }
+        
+        // Audiobook delete button
+        const audiobookDeleteBtn = document.getElementById('audiobook_delete_btn');
+        if (audiobookDeleteBtn) {
+            audiobookDeleteBtn.addEventListener('click', () => {
+                const audiobookList = document.getElementById('audiobook_list');
+                if (audiobookList && audiobookList.value) {
+                    this.deleteAudiobook(audiobookList.value);
+                }
+            });
         }
     }
     
@@ -603,115 +688,12 @@ class Ebook2AudiobookApp {
             });
         }
     }
-                result.voices.forEach(voice => {
-                    const option = document.createElement('option');
-                    option.value = voice.path;
-                    option.textContent = voice.name;
-                    select.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Failed to load voices:', error);
-            // Don't throw - just log and continue
-        }
-    }
-    
-    async loadAvailableModels() {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-            
-            const response = await fetch('/models/list', {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            
-            const result = await response.json();
-            
-            const select = document.getElementById('custom_model_list');
-            if (select) {
-                select.innerHTML = '<option value="">Select from uploaded models...</option>';
-                
-                result.models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.path;
-                    option.textContent = model.name;
-                    select.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Failed to load models:', error);
-            // Don't throw - just log and continue
-        }
-    }
-    
-    handleInputModeChange(e) {
-        const fileUpload = document.getElementById('file_upload');
-        
-        if (e.target.value === 'file') {
-            fileUpload.style.display = 'block';
-        } else {
-            fileUpload.style.display = 'none';
-        }
-    }
-    
-    handleVoiceSelection(e) {
-        if (e.target.value) {
-            // Use selected voice from list
-            this.showSuccess(`Selected voice: ${e.target.options[e.target.selectedIndex].text}`);
-        }
-    }
-    
-    handleCustomModelSelection(e) {
-        if (e.target.value) {
-            // Use selected model from list
-            this.showSuccess(`Selected model: ${e.target.options[e.target.selectedIndex].text}`);
-        }
-    }
-    
-    handleTTSEngineChange(e) {
-        const engine = e.target.value;
-        const ratingDiv = document.getElementById('tts_rating');
-        
-        // Show different parameter tabs based on engine
-        const xttsTab = document.getElementById('xtts-tab');
-        const barkTab = document.getElementById('bark-tab');
-        
-        if (engine && (engine.toLowerCase().includes('xtts') || engine.toLowerCase().includes('vits'))) {
-            xttsTab.style.display = 'block';
-        } else {
-            xttsTab.style.display = 'none';
-        }
-        
-        if (engine && engine.toLowerCase().includes('bark')) {
-            barkTab.style.display = 'block';
-        } else {
-            barkTab.style.display = 'none';
-        }
-        
-        // Add engine rating/info
-        const engineInfo = this.getEngineInfo(engine);
-        ratingDiv.innerHTML = engineInfo;
-    }
-    
-    getEngineInfo(engine) {
-        const engineMap = {
-            'XTTSv2': '<div class="alert alert-info p-2"><small><strong>XTTS v2:</strong> High quality, supports voice cloning</small></div>',
-            'BARK': '<div class="alert alert-warning p-2"><small><strong>BARK:</strong> Creative voices, requires GPU</small></div>',
-            'VITS': '<div class="alert alert-info p-2"><small><strong>VITS:</strong> Fast synthesis, good quality</small></div>',
-            'FAIRSEQ': '<div class="alert alert-secondary p-2"><small><strong>FAIRSEQ:</strong> Research model</small></div>',
-            'TACOTRON2': '<div class="alert alert-secondary p-2"><small><strong>TACOTRON2:</strong> Classic TTS</small></div>',
-            'YOURTTS': '<div class="alert alert-info p-2"><small><strong>YourTTS:</strong> Multi-speaker synthesis</small></div>'
-        };
-        
-        return engineMap[engine] || '';
-    }
     
     async handleFormSubmit(e) {
         e.preventDefault();
         
         // Validate required fields
-        if (!this.uploadedFiles.ebook && document.querySelector('input[name="input_mode"]:checked').value === 'file') {
+        if (!this.uploadedFiles.ebook) {
             this.showError('Please upload an ebook file');
             return;
         }
@@ -735,7 +717,9 @@ class Ebook2AudiobookApp {
             
             if (result.success) {
                 this.currentConversionId = result.conversion_id;
-                this.socket.emit('join_conversion', { conversion_id: this.currentConversionId });
+                if (this.socket) {
+                    this.socket.emit('join_conversion', { conversion_id: this.currentConversionId });
+                }
                 this.showSuccess('Conversion started successfully');
             } else {
                 this.showError(result.error);
@@ -759,107 +743,49 @@ class Ebook2AudiobookApp {
             data[key] = value;
         }
         
-        // Add file paths from uploads
-        if (this.uploadedFiles.ebook) {
-            data.ebook = this.uploadedFiles.ebook.path;
-        }
-        if (this.uploadedFiles.voice) {
-            data.voice = this.uploadedFiles.voice.path;
-        }
-        if (this.uploadedFiles.customModel) {
-            data.custom_model = this.uploadedFiles.customModel.path;
-        }
-        
-        // Handle voice selection
+        // Add selected values from dropdowns
         const voiceList = document.getElementById('voice_list');
-        if (voiceList.value && !data.voice) {
+        if (voiceList && voiceList.value) {
             data.voice = voiceList.value;
         }
         
-        // Handle custom model selection
         const modelList = document.getElementById('custom_model_list');
-        if (modelList.value && !data.custom_model) {
+        if (modelList && modelList.value) {
             data.custom_model = modelList.value;
         }
         
         return data;
     }
     
-    setupParameterSliders() {
-        // XTTS parameter sliders
-        const xttsSliders = [
-            'temperature', 'repetition_penalty', 'top_k', 'top_p', 'speed'
-        ];
-        
-        xttsSliders.forEach(sliderId => {
-            const slider = document.getElementById(sliderId);
-            const valueDisplay = document.getElementById(`${sliderId}_value`);
-            
-            if (slider && valueDisplay) {
-                slider.addEventListener('input', (e) => {
-                    valueDisplay.textContent = e.target.value;
-                });
-            }
-        });
-        
-        // BARK parameter sliders
-        const barkSliders = ['text_temp', 'waveform_temp'];
-        
-        barkSliders.forEach(sliderId => {
-            const slider = document.getElementById(sliderId);
-            const valueDisplay = document.getElementById(`${sliderId}_value`);
-            
-            if (slider && valueDisplay) {
-                slider.addEventListener('input', (e) => {
-                    valueDisplay.textContent = e.target.value;
-                });
-            }
-        });
-    }
-    
     showProgress() {
-        // Progress is now shown inline in the main form
         const progressTextarea = document.getElementById('conversion_progress');
         if (progressTextarea) {
+            progressTextarea.value = 'Starting conversion...\n';
             progressTextarea.scrollIntoView({ behavior: 'smooth' });
         }
     }
     
     hideProgress() {
-        // Progress textarea is always visible, just clear it
         const progressTextarea = document.getElementById('conversion_progress');
         if (progressTextarea) {
             progressTextarea.value = '';
         }
     }
     
-    showDownload() {
-        // Show the audiobook results section
-        const audiobookResults = document.getElementById('audiobook_results');
-        if (audiobookResults) {
-            audiobookResults.classList.remove('d-none');
-            audiobookResults.scrollIntoView({ behavior: 'smooth' });
-        }
-    }
-    
-    hideDownload() {
-        // Hide the audiobook results section
-        const audiobookResults = document.getElementById('audiobook_results');
-        if (audiobookResults) {
-            audiobookResults.classList.add('d-none');
-        }
-    }
-    
     disableForm() {
         const form = document.getElementById('conversionForm');
-        const inputs = form.querySelectorAll('input, select, button');
-        inputs.forEach(input => input.disabled = true);
+        if (form) {
+            const inputs = form.querySelectorAll('input, select, button');
+            inputs.forEach(input => input.disabled = true);
+        }
     }
     
     enableForm() {
         const form = document.getElementById('conversionForm');
-        const inputs = form.querySelectorAll('input, select, button');
-        inputs.forEach(input => input.disabled = false);
+        if (form) {
+            const inputs = form.querySelectorAll('input, select, button');
+            inputs.forEach(input => input.disabled = false);
+        }
     }
     
     enableConvertButton() {
@@ -869,58 +795,23 @@ class Ebook2AudiobookApp {
         }
     }
     
-    disableConvertButton() {
-        const convertBtn = document.getElementById('convert_btn');
-        if (convertBtn) {
-            convertBtn.disabled = true;
-        }
-    }
-    
     handleConversionStart(data) {
-        this.updateProgress(0, 'Starting conversion...');
-        this.logMessage('Conversion started');
+        this.updateProgress('Conversion started');
     }
     
     handleConversionProgress(data) {
-        const percentage = data.percentage || 0;
         const message = data.message || 'Processing...';
-        
-        this.updateProgress(percentage, message);
-        this.logMessage(message);
+        this.updateProgress(message);
     }
     
     handleConversionComplete(data) {
         if (data.success) {
-            this.updateProgress(100, 'Conversion completed successfully!');
-            this.logMessage('Conversion completed successfully');
-            this.showDownload();
-            
-            // Update audiobook display
-            const audiobookText = document.getElementById('audiobook_text');
-            if (audiobookText && data.filename) {
-                audiobookText.value = data.filename;
-            }
-            
-            // Setup audiobook player
-            if (data.preview_url) {
-                const audiobookPlayer = document.getElementById('audiobook_player');
-                const audiobookSource = document.getElementById('audiobook_audio_source');
-                if (audiobookPlayer && audiobookSource) {
-                    audiobookSource.src = data.preview_url;
-                    audiobookPlayer.load();
-                }
-            }
-            
-            // Setup download button
-            const downloadBtn = document.getElementById('audiobook_download_btn');
-            if (downloadBtn && data.conversion_id) {
-                downloadBtn.onclick = () => {
-                    window.location.href = `/download/${data.conversion_id}`;
-                };
-            }
+            this.updateProgress('Conversion completed successfully!');
+            this.showSuccess('Conversion completed successfully');
+            this.loadAudiobooks(); // Refresh audiobook list
         } else {
             this.showError(`Conversion failed: ${data.error}`);
-            this.logMessage(`Error: ${data.error}`);
+            this.updateProgress(`Error: ${data.error}`);
         }
         
         this.enableForm();
@@ -928,21 +819,11 @@ class Ebook2AudiobookApp {
     
     handleConversionError(data) {
         this.showError(`Conversion error: ${data.error}`);
-        this.logMessage(`Error: ${data.error}`);
+        this.updateProgress(`Error: ${data.error}`);
         this.enableForm();
     }
     
-    updateProgress(percentage, message) {
-        const progressTextarea = document.getElementById('conversion_progress');
-        if (progressTextarea) {
-            const timestamp = new Date().toLocaleTimeString();
-            const progressLine = `[${timestamp}] ${Math.round(percentage)}% - ${message}\n`;
-            progressTextarea.value += progressLine;
-            progressTextarea.scrollTop = progressTextarea.scrollHeight;
-        }
-    }
-    
-    logMessage(message) {
+    updateProgress(message) {
         const progressTextarea = document.getElementById('conversion_progress');
         if (progressTextarea) {
             const timestamp = new Date().toLocaleTimeString();
@@ -990,13 +871,17 @@ class Ebook2AudiobookApp {
     
     showGlassMask(message = 'Please wait...') {
         const mask = document.getElementById('glass-mask');
-        mask.querySelector('div').textContent = message;
-        mask.classList.remove('d-none');
+        if (mask) {
+            mask.querySelector('div').textContent = message;
+            mask.classList.remove('d-none');
+        }
     }
     
     hideGlassMask() {
         const mask = document.getElementById('glass-mask');
-        mask.classList.add('d-none');
+        if (mask) {
+            mask.classList.add('d-none');
+        }
     }
 }
 
