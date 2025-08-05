@@ -27,7 +27,7 @@ from lib.functions import (
     get_sanitized, language_mapping, models, TTS_ENGINES, prog_version,
     default_language_code, default_device, default_output_format,
     default_fine_tuned, default_engine_settings, ebook_formats, voice_formats,
-    output_formats, max_custom_voices, max_custom_models, interface_component_options,
+    output_formats, max_custom_voices, max_custom_model, interface_component_options,
     show_rating, extract_custom_model, analyze_uploaded_file
 )
 from lib.classes.voice_extractor import VoiceExtractor
@@ -748,8 +748,8 @@ class FlaskInterface:
             
             # Check custom model limit
             custom_model_options = self.get_custom_model_options(session_id)
-            if len(custom_model_options) >= max_custom_models:
-                return jsonify({'error': f'Maximum {max_custom_models} custom models allowed'}), 400
+            if len(custom_model_options) >= max_custom_model:
+                return jsonify({'error': f'Maximum {max_custom_model} custom models allowed'}), 400
             
             if not file.filename.endswith('.zip'):
                 return jsonify({'error': 'Custom model must be a ZIP file'}), 400
