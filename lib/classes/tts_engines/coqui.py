@@ -187,7 +187,8 @@ class Coqui:
                     from piper import PiperVoice
                     
                     # Get voice model name from session or use default
-                    voice_name = self.session.get('voice_model', 'en_US-lessac-medium')
+                    # Prefer 'voice' (from web GUI) over 'voice_model' (from command line)
+                    voice_name = self.session.get('voice') or self.session.get('voice_model', 'en_US-lessac-medium')
                     if voice_name not in default_engine_settings[TTS_ENGINES['PIPER']]['voices']:
                         voice_name = 'en_US-lessac-medium'  # fallback
                     
