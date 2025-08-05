@@ -186,9 +186,22 @@ class Coqui:
                 if self.session['tts_engine'] == TTS_ENGINES['PIPER']:
                     from piper import PiperVoice
                     
-                    # Get voice model name from session or use default
+                    # Get voice model name from session or use language-appropriate default
                     # Prefer 'voice' (from web GUI) over 'voice_model' (from command line)
-                    voice_name = self.session.get('voice') or self.session.get('voice_model', 'en_US-lessac-medium')
+                    voice_name = self.session.get('voice') or self.session.get('voice_model')
+                    
+                    # If no explicit voice specified, choose based on language
+                    if not voice_name:
+                        language_to_voice = {
+                            'eng': 'en_US-lessac-medium',
+                            'deu': 'de_DE-thorsten-medium', 
+                            'fra': 'fr_FR-upmc-medium',
+                            'spa': 'es_ES-davefx-medium',
+                            'ita': 'it_IT-riccardo-x_low',
+                            'por': 'pt_BR-edresson-low'
+                        }
+                        voice_name = language_to_voice.get(self.session.get('language', 'eng'), 'en_US-lessac-medium')
+                    
                     if voice_name not in default_engine_settings[TTS_ENGINES['PIPER']]['voices']:
                         voice_name = 'en_US-lessac-medium'  # fallback
                     
