@@ -30,7 +30,10 @@ from lib.functions import (
     output_formats, max_custom_voices, max_custom_model, interface_component_options,
     show_rating, extract_custom_model, analyze_uploaded_file
 )
-from lib.classes.voice_extractor import VoiceExtractor
+try:
+    from lib.classes.voice_extractor import VoiceExtractor
+except ImportError:
+    VoiceExtractor = None
 
 
 class FlaskInterface:
@@ -475,9 +478,9 @@ class FlaskInterface:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
-        @self.app.route('/upload/directory', methods=['POST'])
-        def upload_directory():
-            """Handle directory upload for batch processing"""
+        @self.app.route('/upload/files', methods=['POST'])
+        def upload_files():
+            """Handle multiple file uploads for batch processing"""
             if 'files' not in request.files:
                 return jsonify({'error': 'No files provided'}), 400
             
@@ -529,7 +532,7 @@ class FlaskInterface:
             return jsonify({'voices': self.get_voice_options(session_id)})
         
         @self.app.route('/api/voices/<path:voice_path>/delete', methods=['POST'])
-        def delete_voice(voice_path):
+        def delete_voice_by_path(voice_path):
             """Delete a voice file"""
             session_id = session.get('session_id')
             if not session_id:
@@ -723,7 +726,7 @@ class FlaskInterface:
                 return jsonify({'error': str(e)}), 500
                 
         @self.app.route('/upload/custom_model', methods=['POST'])
-        def upload_custom_model():
+        def upload_custom_model_file():
             """Handle custom model upload"""
             if 'file' not in request.files:
                 return jsonify({'error': 'No file provided'}), 400
@@ -807,7 +810,7 @@ class FlaskInterface:
                 return jsonify({'error': str(e)}), 500
                 
         @self.app.route('/api/custom_model/delete', methods=['POST'])
-        def delete_custom_model():
+        def delete_custom_model_api():
             """Delete a custom model"""
             try:
                 data = request.get_json()
