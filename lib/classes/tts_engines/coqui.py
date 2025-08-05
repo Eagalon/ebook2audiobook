@@ -302,165 +302,6 @@ class Coqui:
             error = f'_load_checkpoint() error: {e}'
         return False
 
-    def _synthesize_with_piper(self, voice, text):
-        """Synthesize audio using Piper voice"""
-        try:
-            import io
-            import wave
-            import tempfile
-            import os
-            
-            # Validate inputs
-            if not voice:
-                error = 'Piper voice is None'
-                print(error)
-                return None
-                
-            if not text or not text.strip():
-                error = 'Text is empty or None'
-                print(error)
-                return None
-            
-            # Create a temporary WAV file for Piper output
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
-                temp_wav_path = temp_wav.name
-            
-            try:
-                print(f"Attempting Piper synthesis for text: '{text[:50]}...'")
-                print(f"Using temporary WAV file: {temp_wav_path}")
-                
-                # Synthesize audio to temporary WAV file
-                try:
-                    print("Calling voice.synthesize...")
-                    
-                    # Try generator approach - Piper returns a generator of audio chunks
-                    audio_chunks = voice.synthesize(text)
-                    
-                    if audio_chunks is not None:
-                        # Collect all audio chunks into a single array
-                        import numpy as np
-                        audio_data = []
-                        for chunk in audio_chunks:
-                            # AudioChunk objects have an 'audio' attribute containing the actual audio data
-                            if chunk is not None:
-                                if hasattr(chunk, 'audio') and chunk.audio is not None:
-                                    # Piper AudioChunk with .audio attribute
-                                    if hasattr(chunk.audio, '__len__') and len(chunk.audio) > 0:
-                                        audio_data.extend(chunk.audio)
-                                elif hasattr(chunk, '__iter__') and not isinstance(chunk, (str, bytes)):
-                                    # Handle raw audio data arrays
-                                    try:
-                                        audio_data.extend(chunk)
-                                    except TypeError:
-                                        # chunk might be a single value
-                                        audio_data.append(chunk)
-                                elif hasattr(chunk, '__len__') and len(chunk) > 0:
-                                    # Direct audio data
-                                    audio_data.extend(chunk)
-                        
-                        if len(audio_data) > 0:
-                            # Convert to numpy array and write to WAV file
-                            audio_array = np.array(audio_data, dtype=np.int16)
-                            import soundfile as sf
-                            # Use Piper's sample rate (22050 Hz is standard for Piper)
-                            sf.write(temp_wav_path, audio_array, 22050)
-                            print(f"Successfully wrote {len(audio_array)} samples to WAV file")
-                        else:
-                            print("No audio data in generator chunks")
-                            return None
-                    else:
-                        print("No audio chunks returned from voice.synthesize")
-                        return None
-                        
-                except Exception as synthesis_error:
-                    print(f"Generator synthesis approach failed: {synthesis_error}")
-                    # Second try: Original approach with file handle
-                    try:
-                        with open(temp_wav_path, 'wb') as wav_file:
-                            voice.synthesize(text, wav_file)
-                        print("Fallback synthesis approach completed")
-                    except Exception as fallback_error:
-                        print(f"Fallback synthesis also failed: {fallback_error}")
-                        return None
-                
-                print("voice.synthesize completed")
-                
-                # Check if file has audio data
-                file_size = os.path.getsize(temp_wav_path) if os.path.exists(temp_wav_path) else 0
-                print(f"Generated WAV file size: {file_size} bytes")
-                
-                if not os.path.exists(temp_wav_path) or file_size == 0:
-                    error = f'No audio data was generated for text: "{text[:50]}..."'
-                    print(error)
-                    return None
-                
-                # Read the WAV file and extract audio data
-                with wave.open(temp_wav_path, 'rb') as wav_file:
-                    # Get audio parameters
-                    frames = wav_file.getnframes()
-                    sample_rate = wav_file.getframerate()
-                    sample_width = wav_file.getsampwidth()
-                    channels = wav_file.getnchannels()
-                    
-                    print(f"WAV file parameters - frames: {frames}, sample_rate: {sample_rate}, sample_width: {sample_width}, channels: {channels}")
-                    
-                    if frames == 0:
-                        error = 'Generated WAV file contains no audio frames'
-                        print(error)
-                        return None
-                    
-                    # Read the raw audio data
-                    audio_data = wav_file.readframes(frames)
-                
-                # Convert raw audio data to numpy array
-                import numpy as np
-                
-                if sample_width == 1:
-                    # 8-bit audio
-                    audio_array = np.frombuffer(audio_data, dtype=np.uint8).astype(np.float32)
-                    audio_array = (audio_array - 128.0) / 128.0
-                elif sample_width == 2:
-                    # 16-bit audio (most common for Piper)
-                    audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
-                    audio_array = audio_array / 32768.0
-                elif sample_width == 4:
-                    # 32-bit audio
-                    audio_array = np.frombuffer(audio_data, dtype=np.int32).astype(np.float32)
-                    audio_array = audio_array / 2147483648.0
-                else:
-                    error = f'Unsupported sample width: {sample_width}'
-                    print(error)
-                    return None
-                
-                # Handle multi-channel audio by taking only the first channel
-                if channels > 1:
-                    audio_array = audio_array.reshape(-1, channels)[:, 0]
-                
-                # Validate the result
-                if audio_array.size == 0:
-                    error = 'Final audio array is empty'
-                    print(error)
-                    return None
-                
-                print(f"Successfully synthesized audio array with {audio_array.size} samples")
-                return audio_array
-                
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_wav_path):
-                    os.unlink(temp_wav_path)
-            
-        except ImportError as e:
-            error = f'Missing required module for Piper synthesis: {e}'
-            print(error)
-            return None
-        except Exception as e:
-            error = f'Error synthesizing with Piper: {e}'
-            print(error)
-            import traceback
-            traceback.print_exc()
-            return None
-
     def _check_xtts_builtin_speakers(self, voice_path, speaker, device):
         try:
             voice_parts = Path(voice_path).parts
@@ -1006,9 +847,10 @@ class Coqui:
                                 temp_wav_path = temp_wav.name
                             
                             try:
-                                # Use Piper's synthesize method to generate audio directly to file
-                                with open(temp_wav_path, 'wb') as wav_file:
-                                    tts.synthesize(sentence, wav_file)
+                                # Use Piper's synthesize_wav method to generate audio directly to WAV file
+                                import wave
+                                with wave.open(temp_wav_path, 'wb') as wav_file:
+                                    tts.synthesize_wav(sentence, wav_file)
                                 
                                 # Read the WAV file and extract audio data
                                 with wave.open(temp_wav_path, 'rb') as wav_file:
