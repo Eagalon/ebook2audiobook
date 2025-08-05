@@ -89,6 +89,17 @@ class FlaskInterface:
                         for param, value in params.items():
                             ctx_session[param] = value
                 
+                # Calculate dynamic visibility based on current TTS engine and fine_tuned model
+                ctx_session = self.ctx.get_session(session_id)
+                current_engine = ctx_session.get('tts_engine')
+                current_fine_tuned = ctx_session.get('fine_tuned', default_fine_tuned)
+                
+                visible_xtts_params = current_engine == TTS_ENGINES.get('XTTSv2', 'xtts')
+                visible_bark_params = current_engine == TTS_ENGINES.get('BARK', 'bark')
+                visible_custom_model = (current_engine == TTS_ENGINES.get('XTTSv2', 'xtts') and 
+                                      current_fine_tuned == 'internal')
+                visible_voice_file = interface_component_options['gr_group_voice_file']
+                
                 return render_template('index.html', 
                                      version=prog_version,
                                      session_id=session_id,
@@ -102,12 +113,16 @@ class FlaskInterface:
                                      audiobook_options=self.get_audiobook_options(session_id),
                                      xtts_params=self.get_xtts_params(),
                                      bark_params=self.get_bark_params(),
-                                     current_language=self.ctx.get_session(session_id).get('language', default_language_code),
-                                     current_tts_engine=self.ctx.get_session(session_id).get('tts_engine'),
-                                     visible_xtts_params=interface_component_options['gr_tab_xtts_params'],
-                                     visible_bark_params=interface_component_options['gr_tab_bark_params'],
-                                     visible_custom_model=interface_component_options['gr_group_custom_model'],
-                                     visible_voice_file=interface_component_options['gr_group_voice_file'])
+                                     current_language=ctx_session.get('language', default_language_code),
+                                     current_tts_engine=current_engine,
+                                     current_fine_tuned=current_fine_tuned,
+                                     current_device=ctx_session.get('device', default_device),
+                                     current_output_format=ctx_session.get('output_format', default_output_format),
+                                     current_voice=ctx_session.get('voice'),
+                                     visible_xtts_params=visible_xtts_params,
+                                     visible_bark_params=visible_bark_params,
+                                     visible_custom_model=visible_custom_model,
+                                     visible_voice_file=visible_voice_file)
             except Exception as e:
                 return f"Error loading interface: {e}", 500
         
@@ -233,9 +248,10 @@ class FlaskInterface:
                     ctx_session['voice'] = default_voice_path
                 
                 # Determine visibility of components
-                visible_xtts_params = engine == TTS_ENGINES['XTTSv2']
-                visible_bark_params = engine == TTS_ENGINES['BARK']
-                visible_custom_model = engine == TTS_ENGINES['XTTSv2'] and ctx_session['fine_tuned'] == 'internal'
+                visible_xtts_params = engine == TTS_ENGINES.get('XTTSv2', 'xtts')
+                visible_bark_params = engine == TTS_ENGINES.get('BARK', 'bark')
+                visible_custom_model = (engine == TTS_ENGINES.get('XTTSv2', 'xtts') and 
+                                      ctx_session.get('fine_tuned', default_fine_tuned) == 'internal')
                 
                 return jsonify({
                     'success': True,
@@ -246,8 +262,8 @@ class FlaskInterface:
                     'visible_xtts_params': visible_xtts_params,
                     'visible_bark_params': visible_bark_params,
                     'visible_custom_model': visible_custom_model,
-                    'custom_model_label': f"Upload {engine} Model" if engine == TTS_ENGINES['XTTSv2'] else f"Upload Fine Tuned Model not available for {engine}",
-                    'custom_model_files': ', '.join(models[engine][default_fine_tuned]['files']) if engine == TTS_ENGINES['XTTSv2'] else ""
+                    'custom_model_label': f"Upload {engine} Model" if engine == TTS_ENGINES.get('XTTSv2', 'xtts') else f"Upload Fine Tuned Model not available for {engine}",
+                    'custom_model_files': ', '.join(models[engine][default_fine_tuned]['files']) if engine == TTS_ENGINES.get('XTTSv2', 'xtts') else ""
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -545,9 +561,9 @@ class FlaskInterface:
                 voice_name = re.sub(r'_(24000|16000)\.wav$|\.npz$', '', os.path.basename(voice_path))
                 
                 # Check if it's a builtin voice
-                is_builtin = (voice_name in default_engine_settings[TTS_ENGINES['XTTSv2']]['voices'].keys() or
-                             voice_name in default_engine_settings[TTS_ENGINES['BARK']]['voices'].keys() or
-                             voice_name in default_engine_settings[TTS_ENGINES['YOURTTS']]['voices'].keys())
+                is_builtin = (voice_name in default_engine_settings.get(TTS_ENGINES.get('XTTSv2', 'xtts'), {}).get('voices', {}).keys() or
+                             voice_name in default_engine_settings.get(TTS_ENGINES.get('BARK', 'bark'), {}).get('voices', {}).keys() or
+                             voice_name in default_engine_settings.get(TTS_ENGINES.get('YOURTTS', 'yourtts'), {}).get('voices', {}).keys())
                 
                 if is_builtin:
                     return jsonify({'error': f'Voice {voice_name} is builtin and cannot be deleted'}), 400
@@ -690,7 +706,7 @@ class FlaskInterface:
                 return jsonify({'error': 'No session found'}), 400
                 
             ctx_session = self.ctx.get_session(session_id)
-            tts_engine = ctx_session.get('tts_engine', TTS_ENGINES['XTTSv2'])
+            tts_engine = ctx_session.get('tts_engine', TTS_ENGINES.get('XTTSv2', 'xtts'))
             
             return jsonify({'fine_tuned_models': self.get_fine_tuned_options(session_id, tts_engine)})
         
@@ -746,7 +762,7 @@ class FlaskInterface:
                 return jsonify({'error': 'No TTS engine selected'}), 400
             
             # Check if custom models are supported for this engine
-            if current_engine != TTS_ENGINES['XTTSv2']:
+            if current_engine != TTS_ENGINES.get('XTTSv2', 'xtts'):
                 return jsonify({'error': f'Custom models not supported for {current_engine}'}), 400
             
             # Check custom model limit
@@ -856,7 +872,7 @@ class FlaskInterface:
                 # Determine visibility of custom model group
                 current_engine = ctx_session.get('tts_engine')
                 visible_custom_model = False
-                if current_engine == TTS_ENGINES['XTTSv2'] and fine_tuned == 'internal':
+                if current_engine == TTS_ENGINES.get('XTTSv2', 'xtts') and fine_tuned == 'internal':
                     visible_custom_model = interface_component_options['gr_group_custom_model']
                 
                 return jsonify({
@@ -1076,7 +1092,7 @@ class FlaskInterface:
             
             # Add English voices if current language supports XTTSv2
             eng_options = []
-            if tts_engine == TTS_ENGINES['XTTSv2']:
+            if tts_engine == TTS_ENGINES.get('XTTSv2', 'xtts'):
                 builtin_names = {name: None for name, _ in builtin_options}
                 eng_dir = Path(os.path.join(voices_dir, "eng"))
                 if eng_dir.exists():
@@ -1087,13 +1103,13 @@ class FlaskInterface:
             
             # Add BARK speakers if BARK engine is selected
             bark_options = []
-            if tts_engine == TTS_ENGINES['BARK']:
+            if tts_engine == TTS_ENGINES.get('BARK', 'bark'):
                 try:
                     import iso639
                     lang_array = iso639.languages.get(part3=language)
                     if lang_array:
                         lang_iso1 = lang_array.part1.lower()
-                        speakers_path = Path(default_engine_settings[TTS_ENGINES['BARK']]['speakers_path'])
+                        speakers_path = Path(default_engine_settings.get(TTS_ENGINES.get('BARK', 'bark'), {}).get('speakers_path', ''))
                         pattern_speaker = re.compile(r"^.*?_speaker_(\d+)$")
                         if speakers_path.exists():
                             for f in speakers_path.rglob(f"{lang_iso1}_speaker_*.npz"):
@@ -1145,7 +1161,7 @@ class FlaskInterface:
         ctx_session = self.ctx.get_session(session_id)
         tts_engine = ctx_session.get('tts_engine')
         
-        if not tts_engine or tts_engine != TTS_ENGINES['XTTSv2']:
+        if not tts_engine or tts_engine != TTS_ENGINES.get('XTTSv2', 'xtts'):
             return []  # Custom models only supported for XTTSv2
         
         custom_models = []
@@ -1230,7 +1246,7 @@ class FlaskInterface:
     
     def get_xtts_params(self):
         """Get XTTS parameter defaults"""
-        xtts_settings = default_engine_settings.get(TTS_ENGINES['XTTSv2'], {})
+        xtts_settings = default_engine_settings.get(TTS_ENGINES.get('XTTSv2', 'xtts'), {})
         return {
             'temperature': {
                 'min': 0.1, 'max': 10.0, 'step': 0.1,
@@ -1261,7 +1277,7 @@ class FlaskInterface:
     
     def get_bark_params(self):
         """Get BARK parameter defaults"""
-        bark_settings = default_engine_settings.get(TTS_ENGINES['BARK'], {})
+        bark_settings = default_engine_settings.get(TTS_ENGINES.get('BARK', 'bark'), {})
         return {
             'text_temp': {
                 'min': 0.0, 'max': 1.0, 'step': 0.01,

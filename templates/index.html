@@ -295,7 +295,7 @@
                                             <select class="form-select flex-grow-1" id="voice_list">
                                                 <option value="">Select from available voices...</option>
                                                 {% for voice in voice_options %}
-                                                <option value="{{ voice.value }}">{{ voice.label }}</option>
+                                                <option value="{{ voice.value }}" {% if voice.value == current_voice %}selected{% endif %}>{{ voice.label }}</option>
                                                 {% endfor %}
                                             </select>
                                             <button type="button" class="btn btn-outline-danger ms-2 d-none" id="voice_delete_btn">
@@ -336,7 +336,7 @@
                                         <label for="fine_tuned_list" class="form-label">Fine Tuned Models (Presets)</label>
                                         <select class="form-select" id="fine_tuned_list" name="fine_tuned">
                                             {% for model in fine_tuned_options %}
-                                            <option value="{{ model.value }}">{{ model.label }}</option>
+                                            <option value="{{ model.value }}" {% if model.value == current_fine_tuned %}selected{% endif %}>{{ model.label }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
