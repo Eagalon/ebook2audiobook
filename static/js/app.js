@@ -70,6 +70,9 @@ class Ebook2AudiobookApp {
         
         // TTS engine change
         document.getElementById('tts_engine').addEventListener('change', this.handleTTSEngineChange.bind(this));
+        
+        // Parameter sliders
+        this.setupParameterSliders();
     }
     
     setupFileUpload(inputId, fileType, callback) {
@@ -121,6 +124,7 @@ class Ebook2AudiobookApp {
                 this.uploadedFiles.ebook = result;
                 this.showFilePreview('ebook', result.filename, file.size);
                 this.showSuccess(`Ebook uploaded: ${result.filename}`);
+                this.enableConvertButton();
             } else {
                 this.showError(result.error);
             }
@@ -404,22 +408,69 @@ class Ebook2AudiobookApp {
         return data;
     }
     
+    setupParameterSliders() {
+        // XTTS parameter sliders
+        const xttsSliders = [
+            'temperature', 'repetition_penalty', 'top_k', 'top_p', 'speed'
+        ];
+        
+        xttsSliders.forEach(sliderId => {
+            const slider = document.getElementById(sliderId);
+            const valueDisplay = document.getElementById(`${sliderId}_value`);
+            
+            if (slider && valueDisplay) {
+                slider.addEventListener('input', (e) => {
+                    valueDisplay.textContent = e.target.value;
+                });
+            }
+        });
+        
+        // BARK parameter sliders
+        const barkSliders = ['text_temp', 'waveform_temp'];
+        
+        barkSliders.forEach(sliderId => {
+            const slider = document.getElementById(sliderId);
+            const valueDisplay = document.getElementById(`${sliderId}_value`);
+            
+            if (slider && valueDisplay) {
+                slider.addEventListener('input', (e) => {
+                    valueDisplay.textContent = e.target.value;
+                });
+            }
+        });
+    }
+    
     showProgress() {
-        document.getElementById('progress_card').style.display = 'block';
-        document.getElementById('progress_card').scrollIntoView({ behavior: 'smooth' });
+        // Progress is now shown inline in the main form
+        const progressTextarea = document.getElementById('conversion_progress');
+        if (progressTextarea) {
+            progressTextarea.scrollIntoView({ behavior: 'smooth' });
+        }
     }
     
     hideProgress() {
-        document.getElementById('progress_card').style.display = 'none';
+        // Progress textarea is always visible, just clear it
+        const progressTextarea = document.getElementById('conversion_progress');
+        if (progressTextarea) {
+            progressTextarea.value = '';
+        }
     }
     
     showDownload() {
-        document.getElementById('download_card').style.display = 'block';
-        document.getElementById('download_card').scrollIntoView({ behavior: 'smooth' });
+        // Show the audiobook results section
+        const audiobookResults = document.getElementById('audiobook_results');
+        if (audiobookResults) {
+            audiobookResults.classList.remove('d-none');
+            audiobookResults.scrollIntoView({ behavior: 'smooth' });
+        }
     }
     
     hideDownload() {
-        document.getElementById('download_card').style.display = 'none';
+        // Hide the audiobook results section
+        const audiobookResults = document.getElementById('audiobook_results');
+        if (audiobookResults) {
+            audiobookResults.classList.add('d-none');
+        }
     }
     
     disableForm() {
@@ -432,6 +483,20 @@ class Ebook2AudiobookApp {
         const form = document.getElementById('conversionForm');
         const inputs = form.querySelectorAll('input, select, button');
         inputs.forEach(input => input.disabled = false);
+    }
+    
+    enableConvertButton() {
+        const convertBtn = document.getElementById('convert_btn');
+        if (convertBtn) {
+            convertBtn.disabled = false;
+        }
+    }
+    
+    disableConvertButton() {
+        const convertBtn = document.getElementById('convert_btn');
+        if (convertBtn) {
+            convertBtn.disabled = true;
+        }
     }
     
     handleConversionStart(data) {
@@ -453,11 +518,29 @@ class Ebook2AudiobookApp {
             this.logMessage('Conversion completed successfully');
             this.showDownload();
             
+            // Update audiobook display
+            const audiobookText = document.getElementById('audiobook_text');
+            if (audiobookText && data.filename) {
+                audiobookText.value = data.filename;
+            }
+            
+            // Setup audiobook player
+            if (data.preview_url) {
+                const audiobookPlayer = document.getElementById('audiobook_player');
+                const audiobookSource = document.getElementById('audiobook_audio_source');
+                if (audiobookPlayer && audiobookSource) {
+                    audiobookSource.src = data.preview_url;
+                    audiobookPlayer.load();
+                }
+            }
+            
             // Setup download button
-            const downloadBtn = document.getElementById('download_btn');
-            downloadBtn.onclick = () => {
-                window.location.href = `/download/${data.conversion_id}`;
-            };
+            const downloadBtn = document.getElementById('audiobook_download_btn');
+            if (downloadBtn && data.conversion_id) {
+                downloadBtn.onclick = () => {
+                    window.location.href = `/download/${data.conversion_id}`;
+                };
+            }
         } else {
             this.showError(`Conversion failed: ${data.error}`);
             this.logMessage(`Error: ${data.error}`);
@@ -473,25 +556,23 @@ class Ebook2AudiobookApp {
     }
     
     updateProgress(percentage, message) {
-        const progressBar = document.getElementById('progress_bar');
-        const progressMessage = document.getElementById('progress_message');
-        
-        progressBar.style.width = `${percentage}%`;
-        progressBar.textContent = `${Math.round(percentage)}%`;
-        progressMessage.textContent = message;
-        
-        if (percentage === 100) {
-            progressBar.classList.remove('progress-bar-animated');
+        const progressTextarea = document.getElementById('conversion_progress');
+        if (progressTextarea) {
+            const timestamp = new Date().toLocaleTimeString();
+            const progressLine = `[${timestamp}] ${Math.round(percentage)}% - ${message}\n`;
+            progressTextarea.value += progressLine;
+            progressTextarea.scrollTop = progressTextarea.scrollHeight;
         }
     }
     
     logMessage(message) {
-        const logDiv = document.getElementById('progress_log');
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = document.createElement('div');
-        logEntry.innerHTML = `<span class="text-muted">[${timestamp}]</span> ${message}`;
-        logDiv.appendChild(logEntry);
-        logDiv.scrollTop = logDiv.scrollHeight;
+        const progressTextarea = document.getElementById('conversion_progress');
+        if (progressTextarea) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = `[${timestamp}] ${message}\n`;
+            progressTextarea.value += logLine;
+            progressTextarea.scrollTop = progressTextarea.scrollHeight;
+        }
     }
     
     showSuccess(message) {

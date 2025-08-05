@@ -384,10 +384,14 @@ class FlaskInterface:
             if self.is_gui_shared:
                 self.setup_public_sharing(host, port)
             
+            # Disable reloader when running from main app to prevent port conflicts
+            use_reloader = debug and not self.is_gui_process
+            
             self.socketio.run(self.app, 
                             host=host, 
                             port=port, 
-                            debug=debug, 
+                            debug=debug,
+                            use_reloader=use_reloader,
                             allow_unsafe_werkzeug=True)
         except Exception as e:
             print(f'Error starting Flask server: {e}')
