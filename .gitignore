@@ -66,3 +66,7 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Piper TTS models (auto-downloaded)
+models/pip/
+models/models--rhasspy--piper-voices/
