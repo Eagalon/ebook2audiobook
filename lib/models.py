@@ -9,7 +9,8 @@ TTS_ENGINES = {
     "VITS": "vits", 
     "FAIRSEQ": "fairseq", 
     "TACOTRON2": "tacotron", 
-    "YOURTTS": "yourtts"
+    "YOURTTS": "yourtts",
+    "PIPER": "piper"
 }
 
 TTS_VOICE_CONVERSION = {
@@ -152,6 +153,22 @@ default_engine_settings = {
         "files": ['config.json', 'model_file.pth'],
         "voices": {"Machinella-5": "female-en-5", "ElectroMale-2": "male-en-2", 'Machinella-4': 'female-pt-4\n', 'ElectroMale-3': 'male-pt-3\n'},
         "rating": {"GPU VRAM": 1, "CPU": 5, "RAM": 4, "Realism": 1}
+    },
+    TTS_ENGINES['PIPER']: {
+        "samplerate": 22050,
+        "files": ['.onnx', '.onnx.json'],
+        "voices": {
+            "en_US-lessac-medium": "Lessac (US English, medium)",
+            "en_US-amy-medium": "Amy (US English, medium)",
+            "en_GB-alba-medium": "Alba (UK English, medium)",
+            "en_GB-aru-medium": "Aru (UK English, medium)",
+            "de_DE-thorsten-medium": "Thorsten (German, medium)",
+            "fr_FR-upmc-medium": "UPMC (French, medium)",
+            "es_ES-davefx-medium": "Davefx (Spanish, medium)",
+            "it_IT-riccardo-x_low": "Riccardo (Italian, x_low)",
+            "pt_BR-edresson-low": "Edresson (Portuguese Brazil, low)"
+        },
+        "rating": {"GPU VRAM": 1, "CPU": 5, "RAM": 2, "Realism": 4}
     }
 }
 models = {
@@ -487,6 +504,16 @@ models = {
             "voice": None,
             "files": default_engine_settings[TTS_ENGINES['YOURTTS']]['files'],
             "samplerate": default_engine_settings[TTS_ENGINES['YOURTTS']]['samplerate']
+        }
+    },
+    TTS_ENGINES['PIPER']: {
+        "internal": {
+            "lang": "multi", 
+            "repo": "rhasspy/piper-voices",
+            "sub": "",
+            "voice": None,
+            "files": default_engine_settings[TTS_ENGINES['PIPER']]['files'],
+            "samplerate": default_engine_settings[TTS_ENGINES['PIPER']]['samplerate']
         }
     }
 }

@@ -1803,6 +1803,7 @@ def convert_ebook(args, ctx=None):
             session['waveform_temp'] =  args['waveform_temp']
             session['audiobooks_dir'] = args['audiobooks_dir']
             session['voice'] = args['voice']
+            session['voice_model'] = args['voice_model']
             
             info_session = f"\n*********** Session: {id} **************\nStore it in case of interruption, crash, reuse of custom model or custom voice,\nyou can resume the conversion with --session option"
 
