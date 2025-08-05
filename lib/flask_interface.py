@@ -805,7 +805,7 @@ class FlaskInterface:
         return filename.lower().endswith('.zip')
 
 
-def web_interface(args, ctx):
+def web_interface_flask(args, ctx):
     """Start the Flask web interface"""
     interface = FlaskInterface(args, ctx)
     
