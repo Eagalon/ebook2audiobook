@@ -214,6 +214,10 @@ body {
     backdrop-filter: blur(5px);
 }
 
+#glass-mask.d-none {
+    display: none !important;
+}
+
 #glass-mask.hide {
     opacity: 0 !important;
     pointer-events: none !important;

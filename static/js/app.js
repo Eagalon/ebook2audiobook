@@ -19,33 +19,65 @@ class Ebook2AudiobookApp {
     init() {
         this.initSocketIO();
         this.setupEventListeners();
-        this.loadAvailableVoices();
-        this.loadAvailableModels();
-        this.hideGlassMask();
+        
+        // Load data asynchronously but don't block initialization
+        Promise.allSettled([
+            this.loadAvailableVoices(),
+            this.loadAvailableModels()
+        ]).finally(() => {
+            // Always hide the glass mask after a short delay, regardless of loading success
+            setTimeout(() => {
+                this.hideGlassMask();
+            }, 500);
+        });
+        
+        // Fallback: hide glass mask after 3 seconds no matter what
+        setTimeout(() => {
+            this.hideGlassMask();
+        }, 3000);
     }
     
     initSocketIO() {
-        this.socket = io();
-        
-        this.socket.on('connect', () => {
-            console.log('Connected to server');
-        });
-        
-        this.socket.on('conversion_start', (data) => {
-            this.handleConversionStart(data);
-        });
-        
-        this.socket.on('conversion_progress', (data) => {
-            this.handleConversionProgress(data);
-        });
-        
-        this.socket.on('conversion_complete', (data) => {
-            this.handleConversionComplete(data);
-        });
-        
-        this.socket.on('conversion_error', (data) => {
-            this.handleConversionError(data);
-        });
+        try {
+            // Check if Socket.IO is available
+            if (typeof io === 'undefined') {
+                console.warn('Socket.IO not available, continuing without real-time updates');
+                return;
+            }
+            
+            this.socket = io({
+                timeout: 10000,
+                transports: ['websocket', 'polling']
+            });
+            
+            this.socket.on('connect', () => {
+                console.log('Connected to server');
+            });
+            
+            this.socket.on('connect_error', (error) => {
+                console.warn('Socket connection error:', error);
+                // Continue anyway - the interface can work without real-time updates
+            });
+            
+            this.socket.on('conversion_start', (data) => {
+                this.handleConversionStart(data);
+            });
+            
+            this.socket.on('conversion_progress', (data) => {
+                this.handleConversionProgress(data);
+            });
+            
+            this.socket.on('conversion_complete', (data) => {
+                this.handleConversionComplete(data);
+            });
+            
+            this.socket.on('conversion_error', (data) => {
+                this.handleConversionError(data);
+            });
+        } catch (error) {
+            console.error('Failed to initialize SocketIO:', error);
+            // Continue without socket - basic functionality will still work
+        }
     }
     
     setupEventListeners() {
@@ -55,21 +87,36 @@ class Ebook2AudiobookApp {
         this.setupFileUpload('custom_model_file', 'customModel', this.handleCustomModelUpload.bind(this));
         
         // Form submission
-        document.getElementById('conversionForm').addEventListener('submit', this.handleFormSubmit.bind(this));
+        const form = document.getElementById('conversionForm');
+        if (form) {
+            form.addEventListener('submit', this.handleFormSubmit.bind(this));
+        }
         
         // Input mode switching
-        document.getElementsByName('input_mode').forEach(radio => {
-            radio.addEventListener('change', this.handleInputModeChange.bind(this));
-        });
+        const inputModeRadios = document.getElementsByName('input_mode');
+        if (inputModeRadios) {
+            inputModeRadios.forEach(radio => {
+                radio.addEventListener('change', this.handleInputModeChange.bind(this));
+            });
+        }
         
         // Voice list selection
-        document.getElementById('voice_list').addEventListener('change', this.handleVoiceSelection.bind(this));
+        const voiceList = document.getElementById('voice_list');
+        if (voiceList) {
+            voiceList.addEventListener('change', this.handleVoiceSelection.bind(this));
+        }
         
         // Custom model list selection
-        document.getElementById('custom_model_list').addEventListener('change', this.handleCustomModelSelection.bind(this));
+        const modelList = document.getElementById('custom_model_list');
+        if (modelList) {
+            modelList.addEventListener('change', this.handleCustomModelSelection.bind(this));
+        }
         
         // TTS engine change
-        document.getElementById('tts_engine').addEventListener('change', this.handleTTSEngineChange.bind(this));
+        const ttsEngine = document.getElementById('tts_engine');
+        if (ttsEngine) {
+            ttsEngine.addEventListener('change', this.handleTTSEngineChange.bind(this));
+        }
         
         // Parameter sliders
         this.setupParameterSliders();
@@ -79,6 +126,11 @@ class Ebook2AudiobookApp {
         const input = document.getElementById(inputId);
         const uploadArea = document.getElementById(`${fileType === 'ebook' ? 'ebook' : 
                                                    fileType === 'voice' ? 'voice' : 'model'}_upload_area`);
+        
+        if (!input || !uploadArea) {
+            console.warn(`Missing elements for file upload: ${inputId}, uploadArea for ${fileType}`);
+            return;
+        }
         
         input.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
@@ -232,39 +284,59 @@ class Ebook2AudiobookApp {
     
     async loadAvailableVoices() {
         try {
-            const response = await fetch('/voices/list');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
+            const response = await fetch('/voices/list', {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
             const result = await response.json();
             
             const select = document.getElementById('voice_list');
-            select.innerHTML = '<option value="">Select from available voices...</option>';
-            
-            result.voices.forEach(voice => {
-                const option = document.createElement('option');
-                option.value = voice.path;
-                option.textContent = voice.name;
-                select.appendChild(option);
-            });
+            if (select) {
+                select.innerHTML = '<option value="">Select from available voices...</option>';
+                
+                result.voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.path;
+                    option.textContent = voice.name;
+                    select.appendChild(option);
+                });
+            }
         } catch (error) {
             console.error('Failed to load voices:', error);
+            // Don't throw - just log and continue
         }
     }
     
     async loadAvailableModels() {
         try {
-            const response = await fetch('/models/list');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
+            const response = await fetch('/models/list', {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
             const result = await response.json();
             
             const select = document.getElementById('custom_model_list');
-            select.innerHTML = '<option value="">Select from uploaded models...</option>';
-            
-            result.models.forEach(model => {
-                const option = document.createElement('option');
-                option.value = model.path;
-                option.textContent = model.name;
-                select.appendChild(option);
-            });
+            if (select) {
+                select.innerHTML = '<option value="">Select from uploaded models...</option>';
+                
+                result.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.path;
+                    option.textContent = model.name;
+                    select.appendChild(option);
+                });
+            }
         } catch (error) {
             console.error('Failed to load models:', error);
+            // Don't throw - just log and continue
         }
     }
     

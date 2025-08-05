@@ -390,7 +390,16 @@
         <!-- (Removed - now integrated into main form) -->
     </div>
 
-    <!-- Scripts -->
+    <script>
+        // Immediate fallback for loading screen if CDN fails
+        setTimeout(() => {
+            const mask = document.getElementById('glass-mask');
+            if (mask && !mask.classList.contains('d-none')) {
+                console.log('Fallback: hiding loading screen after timeout');
+                mask.classList.add('d-none');
+            }
+        }, 5000);
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
