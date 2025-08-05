@@ -2044,6 +2044,18 @@ def show_alert(state):
                 gr.Success(state['msg'])
 
 def web_interface(args, ctx):
+    """Original Gradio-based web interface - now replaced by Flask"""
+    # Check if Flask interface should be used instead
+    use_flask = os.environ.get('USE_FLASK', 'true').lower() == 'true'
+    
+    if use_flask:
+        from lib.flask_interface import web_interface_flask
+        return web_interface_flask(args, ctx)
+    
+    # Original Gradio implementation (kept as fallback)
+    web_interface_gradio(args, ctx)
+
+def web_interface_gradio(args, ctx):
     global context
     script_mode = args['script_mode']
     is_gui_process = args['is_gui_process']

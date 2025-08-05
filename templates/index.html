@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ebook2Audiobook v{{ version }}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div id="glass-mask" class="d-none">
+        <div class="text-center">
+            <div class="spinner-border text-warning" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="mt-3">Initialization, please wait...</div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row">
+            <div class="col-12">
+                <div class="header d-flex justify-content-between align-items-center py-3">
+                    <h1 class="h3 mb-0">Ebook2Audiobook</h1>
+                    <div>
+                        <span class="badge bg-success">v{{ version }}</span>
+                        <a href="https://github.com/DrewThomasson/ebook2audiobook" target="_blank" class="btn btn-outline-light btn-sm ms-2">
+                            <i class="fab fa-github"></i> GitHub
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <!-- Tabs -->
+                        <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="main-tab" data-bs-toggle="tab" data-bs-target="#main" type="button" role="tab">
+                                    Main Parameters
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="xtts-tab" data-bs-toggle="tab" data-bs-target="#xtts" type="button" role="tab">
+                                    XTTS Parameters
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="bark-tab" data-bs-toggle="tab" data-bs-target="#bark" type="button" role="tab">
+                                    BARK Parameters
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="mainTabsContent">
+                            <!-- Main Parameters Tab -->
+                            <div class="tab-pane fade show active" id="main" role="tabpanel">
+                                <form id="conversionForm" class="mt-4">
+                                    <div class="row">
+                                        <!-- Left Column -->
+                                        <div class="col-md-6">
+                                            <!-- File Upload Section -->
+                                            <div class="mb-4">
+                                                <label class="form-label">Select Input</label>
+                                                <div class="input-group">
+                                                    <input type="radio" class="btn-check" name="input_mode" id="file_mode" value="file" checked>
+                                                    <label class="btn btn-outline-primary" for="file_mode">File</label>
+                                                    
+                                                    <input type="radio" class="btn-check" name="input_mode" id="directory_mode" value="directory">
+                                                    <label class="btn btn-outline-primary" for="directory_mode">Directory</label>
+                                                </div>
+                                                
+                                                <div id="file_upload" class="mt-3">
+                                                    <div class="upload-area" id="ebook_upload_area">
+                                                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                                        <p class="mb-0">Drag & drop your ebook here or</p>
+                                                        <button type="button" class="btn btn-primary mt-2" onclick="document.getElementById('ebook_file').click()">
+                                                            Choose File
+                                                        </button>
+                                                        <input type="file" id="ebook_file" accept=".epub,.mobi,.azw3,.fb2,.lrf,.rb,.snb,.tcr,.pdf,.txt,.rtf,.doc,.docx,.html,.odt,.azw" style="display: none;">
+                                                        <div id="ebook_filename" class="mt-2 text-success d-none"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Language Selection -->
+                                            <div class="mb-4">
+                                                <label for="language" class="form-label">Language</label>
+                                                <select class="form-select" id="language" name="language">
+                                                    {% for lang in language_options %}
+                                                    <option value="{{ lang.code }}">{{ lang.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+
+                                            <!-- Voice File Upload -->
+                                            <div class="mb-4">
+                                                <label class="form-label">Cloning Voice Audio File <small class="text-muted">(Optional)</small></label>
+                                                <div class="upload-area" id="voice_upload_area">
+                                                    <i class="fas fa-microphone fa-2x text-muted mb-2"></i>
+                                                    <p class="mb-0">Upload voice file for cloning</p>
+                                                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="document.getElementById('voice_file').click()">
+                                                        Choose Voice File
+                                                    </button>
+                                                    <input type="file" id="voice_file" accept=".mp4,.m4b,.m4a,.mp3,.wav,.aac,.flac,.alac,.ogg,.aiff,.aif,.wma,.dsd,.opus,.pcmu,.pcma,.gsm" style="display: none;">
+                                                    <div id="voice_filename" class="mt-2 text-success d-none"></div>
+                                                </div>
+                                                
+                                                <!-- Voice Preview -->
+                                                <div id="voice_preview" class="mt-3 d-none">
+                                                    <audio controls class="w-100">
+                                                        <source id="voice_audio_source" src="" type="audio/mpeg">
+                                                        Your browser does not support the audio element.
+                                                    </audio>
+                                                </div>
+
+                                                <!-- Voice List -->
+                                                <div class="mt-3">
+                                                    <select class="form-select" id="voice_list">
+                                                        <option value="">Select from available voices...</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <!-- Device Selection -->
+                                            <div class="mb-4">
+                                                <label class="form-label">Processor Unit</label>
+                                                <div class="btn-group w-100" role="group">
+                                                    {% for device in device_options %}
+                                                    <input type="radio" class="btn-check" name="device" id="device_{{ device.value }}" value="{{ device.value }}" {% if device.value == 'cpu' %}checked{% endif %}>
+                                                    <label class="btn btn-outline-info" for="device_{{ device.value }}">{{ device.label }}</label>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Right Column -->
+                                        <div class="col-md-6">
+                                            <!-- TTS Engine -->
+                                            <div class="mb-4">
+                                                <label for="tts_engine" class="form-label">TTS Engine</label>
+                                                <select class="form-select" id="tts_engine" name="tts_engine">
+                                                    {% for engine in tts_engine_options %}
+                                                    <option value="{{ engine.value }}">{{ engine.label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <div id="tts_rating" class="mt-2"></div>
+                                            </div>
+
+                                            <!-- Fine Tuned Models -->
+                                            <div class="mb-4">
+                                                <label for="fine_tuned" class="form-label">Fine Tuned Models (Presets)</label>
+                                                <select class="form-select" id="fine_tuned" name="fine_tuned">
+                                                    <option value="">Select preset...</option>
+                                                </select>
+                                            </div>
+
+                                            <!-- Custom Model Upload -->
+                                            <div class="mb-4" id="custom_model_section">
+                                                <label class="form-label">Upload Fine Tuned Model</label>
+                                                <div class="upload-area" id="model_upload_area">
+                                                    <i class="fas fa-cog fa-2x text-muted mb-2"></i>
+                                                    <p class="mb-0">Upload custom model (.zip)</p>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="document.getElementById('custom_model_file').click()">
+                                                        Choose Model File
+                                                    </button>
+                                                    <input type="file" id="custom_model_file" accept=".zip" style="display: none;">
+                                                    <div id="model_filename" class="mt-2 text-success d-none"></div>
+                                                </div>
+                                                
+                                                <!-- Custom Model List -->
+                                                <div class="mt-3">
+                                                    <select class="form-select" id="custom_model_list">
+                                                        <option value="">Select from uploaded models...</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <!-- Output Format -->
+                                            <div class="mb-4">
+                                                <label for="output_format" class="form-label">Output Format</label>
+                                                <select class="form-select" id="output_format" name="output_format">
+                                                    {% for format in output_format_options %}
+                                                    <option value="{{ format.value }}" {% if format.value == 'm4b' %}selected{% endif %}>{{ format.label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+
+                                            <!-- Session ID -->
+                                            <div class="mb-4">
+                                                <label for="session_id" class="form-label">Session ID <small class="text-muted">(Optional)</small></label>
+                                                <input type="text" class="form-control" id="session_id" name="session_id" placeholder="Auto-generated if empty">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Convert Button -->
+                                    <div class="row">
+                                        <div class="col-12 text-center">
+                                            <button type="submit" class="btn btn-success btn-lg" id="convert_btn">
+                                                <i class="fas fa-magic"></i> Convert to Audiobook
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- XTTS Parameters Tab -->
+                            <div class="tab-pane fade" id="xtts" role="tabpanel">
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="temperature" class="form-label">Temperature</label>
+                                            <input type="number" class="form-control" id="temperature" name="temperature" step="0.1" min="0" max="1" placeholder="Default model setting">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="length_penalty" class="form-label">Length Penalty</label>
+                                            <input type="number" class="form-control" id="length_penalty" name="length_penalty" step="0.1" placeholder="Default model setting">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="num_beams" class="form-label">Number of Beams</label>
+                                            <input type="number" class="form-control" id="num_beams" name="num_beams" min="1" placeholder="Default model setting">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="repetition_penalty" class="form-label">Repetition Penalty</label>
+                                            <input type="number" class="form-control" id="repetition_penalty" name="repetition_penalty" step="0.1" placeholder="Default model setting">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="top_k" class="form-label">Top K</label>
+                                            <input type="number" class="form-control" id="top_k" name="top_k" min="1" placeholder="Default model setting">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="top_p" class="form-label">Top P</label>
+                                            <input type="number" class="form-control" id="top_p" name="top_p" step="0.1" min="0" max="1" placeholder="Default model setting">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="speed" class="form-label">Speed</label>
+                                            <input type="number" class="form-control" id="speed" name="speed" step="0.1" min="0.1" placeholder="Default model setting">
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="enable_text_splitting" name="enable_text_splitting">
+                                            <label class="form-check-label" for="enable_text_splitting">
+                                                Enable Text Splitting
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- BARK Parameters Tab -->
+                            <div class="tab-pane fade" id="bark" role="tabpanel">
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="text_temp" class="form-label">Text Temperature</label>
+                                            <input type="number" class="form-control" id="text_temp" name="text_temp" step="0.1" min="0" max="1" placeholder="0.5">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="waveform_temp" class="form-label">Waveform Temperature</label>
+                                            <input type="number" class="form-control" id="waveform_temp" name="waveform_temp" step="0.1" min="0" max="1" placeholder="0.5">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card" id="progress_card" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Conversion Progress</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress mb-3" style="height: 30px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="progress_bar" role="progressbar" style="width: 0%">
+                                0%
+                            </div>
+                        </div>
+                        <div id="progress_message" class="text-muted">Waiting to start...</div>
+                        <div id="progress_log" class="mt-3" style="max-height: 200px; overflow-y: auto; background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; font-family: monospace; font-size: 12px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card" id="download_card" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0">Download Audiobook</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="alert alert-success" role="alert">
+                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                            <h4>Conversion Complete!</h4>
+                            <p class="mb-0">Your audiobook is ready for download.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-lg" id="download_btn">
+                            <i class="fas fa-download"></i> Download Audiobook
+                        </button>
+                        <div id="audiobook_preview" class="mt-4 d-none">
+                            <audio controls class="w-100">
+                                <source id="audiobook_audio_source" src="" type="audio/mpeg">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
