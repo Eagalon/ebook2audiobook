@@ -33,3 +33,5 @@ sudachidict_core
 transformers==4.51.3
 coqui-tts[languages]==0.26.0
 torchvggish
+kokoro>=0.9.4
+misaki[en]>=0.9.4

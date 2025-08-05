@@ -41,7 +41,7 @@ class Coqui:
             self.npz_data = None
             self.sentences_total_time = 0.0
             self.sentence_idx = 1
-            self.params = {TTS_ENGINES['XTTSv2']: {"latent_embedding":{}}, TTS_ENGINES['BARK']: {},TTS_ENGINES['VITS']: {"semitones": {}}, TTS_ENGINES['FAIRSEQ']: {"semitones": {}}, TTS_ENGINES['TACOTRON2']: {"semitones": {}}, TTS_ENGINES['YOURTTS']: {}}  
+            self.params = {TTS_ENGINES['XTTSv2']: {"latent_embedding":{}}, TTS_ENGINES['BARK']: {},TTS_ENGINES['VITS']: {"semitones": {}}, TTS_ENGINES['FAIRSEQ']: {"semitones": {}}, TTS_ENGINES['TACOTRON2']: {"semitones": {}}, TTS_ENGINES['YOURTTS']: {}, TTS_ENGINES['KOKORO']: {}}  
             self.params[self.session['tts_engine']]['samplerate'] = models[self.session['tts_engine']][self.session['fine_tuned']]['samplerate']
             self.vtt_path = os.path.join(self.session['process_dir'], os.path.splitext(self.session['final_name'])[0] + '.vtt')    
             self.resampler_cache = {}
@@ -155,6 +155,14 @@ class Coqui:
                     else:
                         model_path = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
                         tts = self._load_api(self.tts_key, model_path, self.session['device'])
+                elif self.session['tts_engine'] == TTS_ENGINES['KOKORO']:
+                    if self.session['custom_model'] is not None:
+                        msg = f"{self.session['tts_engine']} custom model not implemented yet!"
+                        print(msg)
+                        return False
+                    else:
+                        model_path = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
+                        tts = self._load_api(self.tts_key, model_path, self.session['device'])
             if load_zeroshot:
                 tts_vc = (loaded_tts.get(self.tts_vc_key) or {}).get('engine', False)
                 if not tts_vc:
@@ -174,14 +182,30 @@ class Coqui:
             if key in loaded_tts.keys():
                 return loaded_tts[key]['engine']
             unload_tts(device, [self.tts_key, self.tts_vc_key])
-            from TTS.api import TTS as coquiAPI
             with lock:
-                tts = coquiAPI(model_path)
-                if tts:
-                    if device == 'cuda':
-                        tts.cuda()
+                if self.session['tts_engine'] == TTS_ENGINES['KOKORO']:
+                    from kokoro import KPipeline
+                    
+                    # Determine language code based on voice or default to American English
+                    voice_name = self.session.get('voice_model', 'af_heart')
+                    if voice_name.startswith('af_') or voice_name.startswith('am_'):
+                        lang_code = 'a'  # American English
+                    elif voice_name.startswith('bf_') or voice_name.startswith('bm_'):
+                        lang_code = 'b'  # British English
                     else:
-                        tts.to(device)
+                        lang_code = 'a'  # Default to American English
+                    
+                    # Create Kokoro pipeline with the appropriate language code
+                    tts = KPipeline(lang_code=lang_code, repo_id=model_path, device=device)
+                else:
+                    from TTS.api import TTS as coquiAPI
+                    tts = coquiAPI(model_path)
+                if tts:
+                    if self.session['tts_engine'] != TTS_ENGINES['KOKORO']:
+                        if device == 'cuda':
+                            tts.cuda()
+                        else:
+                            tts.to(device)
                     loaded_tts[key] = {"engine": tts, "config": None} 
                     msg = f'{model_path} Loaded!'
                     print(msg)
@@ -778,6 +802,33 @@ class Coqui:
                                 language=language,
                                 **speaker_argument
                             )
+                    elif self.session['tts_engine'] == TTS_ENGINES['KOKORO']:
+                        # Generate audio using Kokoro TTS
+                        try:
+                            voice_name = self.session.get('voice_model', 'af_heart')
+                            
+                            # Ensure the voice exists in the available voices
+                            if voice_name not in default_engine_settings[TTS_ENGINES['KOKORO']]['voices']:
+                                voice_name = 'af_heart'  # fallback to default
+                            
+                            # Use Kokoro pipeline to generate audio
+                            generator = tts(sentence, voice=voice_name, speed=1.0)
+                            
+                            # Get the first (and typically only) result
+                            for result in generator:
+                                audio_sentence = result.audio
+                                if audio_sentence is not None:
+                                    # Convert to numpy array if it's a tensor
+                                    if hasattr(audio_sentence, 'numpy'):
+                                        audio_sentence = audio_sentence.numpy()
+                                    break
+                            else:
+                                audio_sentence = None
+                                
+                        except Exception as e:
+                            error = f'Error synthesizing with Kokoro: {e}'
+                            print(error)
+                            audio_sentence = None
                     if is_audio_data_valid(audio_sentence):
                         sourceTensor = self._tensor_type(audio_sentence)
                         audio_tensor = sourceTensor.clone().detach().unsqueeze(0).cpu()

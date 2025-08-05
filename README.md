@@ -106,7 +106,7 @@ https://github.com/user-attachments/assets/81c4baad-117e-4db5-ac86-efc2b7fea921
 
 ## Features
 - 📚 Splits eBook into chapters for organized audio.
-- 🎙️ High-quality text-to-speech with [Coqui XTTSv2](https://huggingface.co/coqui/XTTS-v2) and [Fairseq](https://github.com/facebookresearch/fairseq/tree/main/examples/mms) (and more).
+- 🎙️ High-quality text-to-speech with [Coqui XTTSv2](https://huggingface.co/coqui/XTTS-v2), [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), and [Fairseq](https://github.com/facebookresearch/fairseq/tree/main/examples/mms) (and more).
 - 🗣️ Optional voice cloning with your own voice file.
 - 🌍 Supports +1110 languages (English by default). [List of Supported languages](https://dl.fbaipublicfiles.com/mms/tts/all-tts-languages.html)
 - 🖥️ Designed to run on 4GB RAM.
@@ -240,7 +240,7 @@ to let the web page reconnect to the new connection socket.**
 usage: app.py [-h] [--session SESSION] [--share] [--headless] [--ebook EBOOK]
               [--ebooks_dir EBOOKS_DIR] [--language LANGUAGE] [--voice VOICE]
               [--device {cpu,gpu,mps}]
-              [--tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,xtts,bark,vits,fairseq,tacotron,yourtts}]
+              [--tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,KOKORO,xtts,bark,vits,fairseq,tacotron,yourtts,kokoro}]
               [--custom_model CUSTOM_MODEL] [--fine_tuned FINE_TUNED]
               [--output_format OUTPUT_FORMAT] [--temperature TEMPERATURE]
               [--length_penalty LENGTH_PENALTY] [--num_beams NUM_BEAMS]
@@ -279,8 +279,8 @@ optional parameters:
   --device {cpu,gpu,mps}
                         (Optional) Pprocessor unit type for the conversion. 
                             Default is set in ./lib/conf.py if not present. Fall back to CPU if GPU not available.
-  --tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,xtts,bark,vits,fairseq,tacotron,yourtts}
-                        (Optional) Preferred TTS engine (available are: ['XTTSv2', 'BARK', 'VITS', 'FAIRSEQ', 'TACOTRON2', 'YOURTTS', 'xtts', 'bark', 'vits', 'fairseq', 'tacotron', 'yourtts'].
+  --tts_engine {XTTSv2,BARK,VITS,FAIRSEQ,TACOTRON2,YOURTTS,KOKORO,xtts,bark,vits,fairseq,tacotron,yourtts,kokoro}
+                        (Optional) Preferred TTS engine (available are: ['XTTSv2', 'BARK', 'VITS', 'FAIRSEQ', 'TACOTRON2', 'YOURTTS', 'KOKORO', 'xtts', 'bark', 'vits', 'fairseq', 'tacotron', 'yourtts', 'kokoro'].
                             Default depends on the selected language. The tts engine should be compatible with the chosen language
   --custom_model CUSTOM_MODEL
                         (Optional) Path to the custom model zip file cntaining mandatory model files. 
@@ -336,6 +336,53 @@ Linux/Mac:
 Tip: to add of silence (1.4 seconds) into your text just use "###" or "[pause]".
 
 ```
+
+### 🎯 Using Kokoro TTS for High-Quality Fast Synthesis
+
+Kokoro TTS is now integrated as a high-performance, lightweight TTS engine that provides excellent quality with fast generation speeds. Kokoro-82M is an open-weight model with only 82 million parameters, making it significantly faster and more cost-efficient than larger models while delivering comparable quality.
+
+#### Available Kokoro Voices
+- **Female American English**: `af_heart`, `af_bella`, `af_sarah`, `af_jessica`, `af_nicole`
+- **Male American English**: `am_adam`, `am_michael`
+- **Female British English**: `bf_emma`, `bf_isabella`
+- **Male British English**: `bm_george`, `bm_daniel`
+
+#### Usage Examples with Kokoro TTS
+
+**Linux/Mac:**
+```bash
+# Basic Kokoro usage with default voice
+./ebook2audiobook.sh --headless --ebook "mybook.epub" --tts_engine KOKORO
+
+# Use a specific Kokoro voice
+./ebook2audiobook.sh --headless --ebook "mybook.epub" --tts_engine KOKORO --voice_model "af_heart"
+
+# Male voice example
+./ebook2audiobook.sh --headless --ebook "mybook.epub" --tts_engine KOKORO --voice_model "am_adam"
+
+# British English voice
+./ebook2audiobook.sh --headless --ebook "mybook.epub" --tts_engine KOKORO --voice_model "bf_emma"
+```
+
+**Windows:**
+```cmd
+# Basic Kokoro usage
+ebook2audiobook.cmd --headless --ebook "mybook.epub" --tts_engine KOKORO
+
+# Use a specific Kokoro voice
+ebook2audiobook.cmd --headless --ebook "mybook.epub" --tts_engine KOKORO --voice_model "af_bella"
+```
+
+#### Kokoro TTS Benefits
+- ⚡ **Fast**: Extremely fast synthesis with 82M parameter model
+- 💾 **Low Memory**: Requires only ~2GB RAM 
+- 🔄 **Auto-Download**: Models downloaded automatically when first used
+- 🎯 **Quality**: High-quality synthesis comparable to much larger models
+- 🌐 **Multi-voice**: Multiple voice options for different characters and styles
+- 📖 **Open Source**: Apache-licensed weights for commercial and personal use
+- 🚀 **CPU Optimized**: Works efficiently on CPU without requiring GPU
+
+> **Note**: The first time you use Kokoro, the system will automatically download the model files (~200MB). Subsequent uses will be instant.
 
 NOTE: in gradio/gui mode, to cancel a running conversion, just click on the [X] from the ebook upload component.
 
