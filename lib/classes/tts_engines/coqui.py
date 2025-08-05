@@ -41,7 +41,7 @@ class Coqui:
             self.npz_data = None
             self.sentences_total_time = 0.0
             self.sentence_idx = 1
-            self.params = {TTS_ENGINES['XTTSv2']: {"latent_embedding":{}}, TTS_ENGINES['BARK']: {},TTS_ENGINES['VITS']: {"semitones": {}}, TTS_ENGINES['FAIRSEQ']: {"semitones": {}}, TTS_ENGINES['TACOTRON2']: {"semitones": {}}, TTS_ENGINES['YOURTTS']: {}, TTS_ENGINES['PIPER']: {}}  
+            self.params = {TTS_ENGINES['XTTSv2']: {"latent_embedding":{}}, TTS_ENGINES['BARK']: {},TTS_ENGINES['VITS']: {"semitones": {}}, TTS_ENGINES['FAIRSEQ']: {"semitones": {}}, TTS_ENGINES['TACOTRON2']: {"semitones": {}}, TTS_ENGINES['YOURTTS']: {}}  
             self.params[self.session['tts_engine']]['samplerate'] = models[self.session['tts_engine']][self.session['fine_tuned']]['samplerate']
             self.vtt_path = os.path.join(self.session['process_dir'], os.path.splitext(self.session['final_name'])[0] + '.vtt')    
             self.resampler_cache = {}
@@ -155,14 +155,6 @@ class Coqui:
                     else:
                         model_path = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
                         tts = self._load_api(self.tts_key, model_path, self.session['device'])
-                elif self.session['tts_engine'] == TTS_ENGINES['PIPER']:
-                    if self.session['custom_model'] is not None:
-                        msg = f"{self.session['tts_engine']} custom model not implemented yet!"
-                        print(msg)
-                        return False
-                    else:
-                        model_path = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
-                        tts = self._load_api(self.tts_key, model_path, self.session['device'])
             if load_zeroshot:
                 tts_vc = (loaded_tts.get(self.tts_vc_key) or {}).get('engine', False)
                 if not tts_vc:
@@ -182,72 +174,14 @@ class Coqui:
             if key in loaded_tts.keys():
                 return loaded_tts[key]['engine']
             unload_tts(device, [self.tts_key, self.tts_vc_key])
+            from TTS.api import TTS as coquiAPI
             with lock:
-                if self.session['tts_engine'] == TTS_ENGINES['PIPER']:
-                    from piper import PiperVoice
-                    
-                    # Get voice model name from session or use language-appropriate default
-                    # Prefer 'voice' (from web GUI) over 'voice_model' (from command line)
-                    voice_name = self.session.get('voice') or self.session.get('voice_model')
-                    
-                    # If no explicit voice specified, choose based on language
-                    if not voice_name:
-                        language_to_voice = {
-                            'eng': 'en_US-lessac-medium',
-                            'deu': 'de_DE-thorsten-medium', 
-                            'fra': 'fr_FR-upmc-medium',
-                            'spa': 'es_ES-davefx-medium',
-                            'ita': 'it_IT-riccardo-x_low',
-                            'por': 'pt_BR-edresson-low'
-                        }
-                        voice_name = language_to_voice.get(self.session.get('language', 'eng'), 'en_US-lessac-medium')
-                    
-                    if voice_name not in default_engine_settings[TTS_ENGINES['PIPER']]['voices']:
-                        voice_name = 'en_US-lessac-medium'  # fallback
-                    
-                    # Map voice names to their subdirectory paths in rhasspy/piper-voices
-                    voice_paths = {
-                        'en_US-lessac-medium': 'en/en_US/lessac/medium',
-                        'en_US-amy-medium': 'en/en_US/amy/medium',
-                        'en_GB-alba-medium': 'en/en_GB/alba/medium',
-                        'en_GB-aru-medium': 'en/en_GB/aru/medium',
-                        'de_DE-thorsten-medium': 'de/de_DE/thorsten/medium',
-                        'fr_FR-upmc-medium': 'fr/fr_FR/upmc/medium',
-                        'es_ES-davefx-medium': 'es/es_ES/davefx/medium',
-                        'it_IT-riccardo-x_low': 'it/it_IT/riccardo-x_low/x_low',
-                        'pt_BR-edresson-low': 'pt/pt_BR/edresson/low'
-                    }
-                    
-                    if voice_name not in voice_paths:
-                        print(f"Unknown voice model: {voice_name}, using default")
-                        voice_name = 'en_US-lessac-medium'
-                    
-                    voice_path = voice_paths[voice_name]
-                    
-                    from huggingface_hub import hf_hub_download
-                    model_file = hf_hub_download(
-                        repo_id=model_path,
-                        filename=f"{voice_path}/{voice_name}.onnx",
-                        cache_dir=self.cache_dir
-                    )
-                    config_file = hf_hub_download(
-                        repo_id=model_path,
-                        filename=f"{voice_path}/{voice_name}.onnx.json",
-                        cache_dir=self.cache_dir
-                    )
-                    
-                    use_cuda = device == 'cuda' and torch.cuda.is_available()
-                    tts = PiperVoice.load(model_file, config_path=config_file, use_cuda=use_cuda)
-                else:
-                    from TTS.api import TTS as coquiAPI
-                    tts = coquiAPI(model_path)
-                    
+                tts = coquiAPI(model_path)
                 if tts:
-                    if self.session['tts_engine'] != TTS_ENGINES['PIPER']:
-                        if device == 'cuda':
-                            tts.cuda()
-                        else:
-                            tts.to(device)
+                    if device == 'cuda':
+                        tts.cuda()
+                    else:
+                        tts.to(device)
                     loaded_tts[key] = {"engine": tts, "config": None} 
                     msg = f'{model_path} Loaded!'
                     print(msg)
@@ -844,30 +778,6 @@ class Coqui:
                                 language=language,
                                 **speaker_argument
                             )
-                    elif self.session['tts_engine'] == TTS_ENGINES['PIPER']:
-                        # Generate audio using Piper TTS
-                        try:
-                            # Use Piper's synthesize method to generate audio directly
-                            audio_generator = tts.synthesize(sentence)
-                            
-                            # Collect all audio data from AudioChunk objects
-                            audio_arrays = []
-                            for audio_chunk in audio_generator:
-                                # Use float array for consistency with other TTS engines
-                                audio_arrays.append(audio_chunk.audio_float_array)
-                            
-                            # Concatenate all arrays
-                            if audio_arrays:
-                                audio_sentence = np.concatenate(audio_arrays)
-                            else:
-                                error = 'No audio chunks generated from Piper'
-                                print(error)
-                                audio_sentence = None
-                                
-                        except Exception as e:
-                            error = f'Error synthesizing with Piper: {e}'
-                            print(error)
-                            audio_sentence = None
                     if is_audio_data_valid(audio_sentence):
                         sourceTensor = self._tensor_type(audio_sentence)
                         audio_tensor = sourceTensor.clone().detach().unsqueeze(0).cpu()
