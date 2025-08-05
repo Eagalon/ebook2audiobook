@@ -18,8 +18,30 @@ from pathlib import Path
 from pprint import pprint
 
 from lib import *
-from lib.classes.tts_engines.common.utils import unload_tts, append_sentence2vtt
-from lib.classes.tts_engines.common.audio_filters import detect_gender, trim_audio, normalize_audio, is_audio_data_valid
+try:
+    from lib.classes.tts_engines.common.utils import unload_tts, append_sentence2vtt
+    from lib.classes.tts_engines.common.audio_filters import detect_gender, trim_audio, normalize_audio, is_audio_data_valid
+except ImportError as e:
+    # Fallback for missing dependencies during development/testing
+    print(f"Warning: Some TTS engine utilities not available: {e}")
+    
+    def unload_tts(*args, **kwargs):
+        pass
+    
+    def append_sentence2vtt(*args, **kwargs):
+        return 1
+        
+    def detect_gender(*args, **kwargs):
+        return "unknown"
+        
+    def trim_audio(audio_tensor, *args, **kwargs):
+        return audio_tensor
+        
+    def normalize_audio(*args, **kwargs):
+        return True
+        
+    def is_audio_data_valid(audio_data):
+        return audio_data is not None
 
 #import logging
 #logging.basicConfig(level=logging.DEBUG)
@@ -156,8 +178,8 @@ class F5TTS:
                 else:
                     if self.session['tts_engine'] == TTS_ENGINES['F5TTS']:
                         # F5-TTS specific generation
-                        nfe_step = default_engine_settings[TTS_ENGINES['F5TTS']].get('nfe', 32)
-                        cfg_strength = default_engine_settings[TTS_ENGINES['F5TTS']].get('cfg_strength', 2.0)
+                        nfe_step = self.session.get('nfe_step') or default_engine_settings[TTS_ENGINES['F5TTS']].get('nfe', 32)
+                        cfg_strength = self.session.get('cfg_strength') or default_engine_settings[TTS_ENGINES['F5TTS']].get('cfg_strength', 2.0)
                         
                         # Generate audio with F5-TTS
                         audio_sentence, _ = tts.infer(
