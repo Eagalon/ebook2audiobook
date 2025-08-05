@@ -511,7 +511,7 @@ models = {
             "lang": "multi", 
             "repo": "rhasspy/piper-voices",
             "sub": "",
-            "voice": None,
+            "voice": "en_US-lessac-medium",
             "files": default_engine_settings[TTS_ENGINES['PIPER']]['files'],
             "samplerate": default_engine_settings[TTS_ENGINES['PIPER']]['samplerate']
         }

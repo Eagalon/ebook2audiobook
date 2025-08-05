@@ -2551,6 +2551,8 @@ def web_interface(args, ctx):
                 rating = default_engine_settings[TTS_ENGINES['TACOTRON2']]['rating']
             elif tts_engine == TTS_ENGINES['YOURTTS']:
                 rating = default_engine_settings[TTS_ENGINES['YOURTTS']]['rating']
+            elif tts_engine == TTS_ENGINES['PIPER']:
+                rating = default_engine_settings[TTS_ENGINES['PIPER']]['rating']
             def yellow_stars(n):
                 return "".join(
                     "<span style='color:#FFD700;font-size:12px'>★</span>" for _ in range(n)
@@ -2855,7 +2857,14 @@ def web_interface(args, ctx):
                             (pattern_speaker.sub(r"Speaker \1", f.stem), str(f.with_suffix(".wav")))
                             for f in speakers_path.rglob(f"{lang}_speaker_*.npz")
                         ]
-                voice_options = builtin_options + eng_options + bark_options
+                piper_options = []
+                if session['tts_engine'] == TTS_ENGINES['PIPER']:
+                    piper_voices = default_engine_settings[TTS_ENGINES['PIPER']]['voices']
+                    piper_options = [
+                        (piper_voices[voice_id], voice_id)
+                        for voice_id in piper_voices.keys()
+                    ]
+                voice_options = builtin_options + eng_options + bark_options + piper_options
                 session['voice_dir'] = os.path.join(voices_dir, '__sessions', f"voice-{session['id']}", session['language'])
                 os.makedirs(session['voice_dir'], exist_ok=True)
                 if session['voice_dir'] is not None:
@@ -2872,17 +2881,20 @@ def web_interface(args, ctx):
                 default_voice_path = models[session['tts_engine']][session['fine_tuned']]['voice']
                 if session['voice'] is None:
                     if voice_options[0][1] is not None:
-                        default_name = Path(default_voice_path).stem
-                        for name, value in voice_options:
-                            if name == default_name:
-                                session['voice'] = value
-                                break
-                        else:
-                            values = [v for _, v in voice_options]
-                            if default_voice_path in values:
-                                session['voice'] = default_voice_path
+                        if default_voice_path is not None:
+                            default_name = Path(default_voice_path).stem
+                            for name, value in voice_options:
+                                if name == default_name:
+                                    session['voice'] = value
+                                    break
                             else:
-                                session['voice'] = voice_options[0][1]
+                                values = [v for _, v in voice_options]
+                                if default_voice_path in values:
+                                    session['voice'] = default_voice_path
+                                else:
+                                    session['voice'] = voice_options[0][1]
+                        else:
+                            session['voice'] = voice_options[0][1]
                 else:
                     current_voice_name = os.path.splitext(os.path.basename(session['voice']))[0]
                     current_voice_path = next(
@@ -2891,7 +2903,7 @@ def web_interface(args, ctx):
                     if current_voice_path:
                         session['voice'] = current_voice_path
                     else:
-                        session['voice'] = default_voice_path
+                        session['voice'] = default_voice_path if default_voice_path is not None else voice_options[0][1]
                 return gr.update(choices=voice_options, value=session['voice'])
             except Exception as e:
                 error = f'update_gr_voice_list(): {e}!'
