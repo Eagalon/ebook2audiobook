@@ -28,7 +28,7 @@ from lib.functions import (
     default_language_code, default_device, default_output_format,
     default_fine_tuned, default_engine_settings, ebook_formats, voice_formats,
     output_formats, max_custom_voices, max_custom_model, interface_component_options,
-    show_rating, extract_custom_model, analyze_uploaded_file
+    show_rating, extract_custom_model, analyze_uploaded_file, voices_dir, models_dir
 )
 try:
     from lib.classes.voice_extractor import VoiceExtractor
@@ -84,6 +84,26 @@ class FlaskInterface:
                     ctx_session['ebook_mode'] = 'single'
                     ctx_session['voice'] = None
                     ctx_session['custom_model'] = None
+                    
+                    # Set up session-specific temporary directory
+                    ctx_session['temp_dir'] = tempfile.mkdtemp(prefix=f'ebook2audiobook_session_{session_id}_')
+                    
+                    # Set up voice directory for this session
+                    try:
+                        ctx_session['voice_dir'] = os.path.join(voices_dir, '__sessions', f"voice-{session_id}", ctx_session['language'])
+                        os.makedirs(ctx_session['voice_dir'], exist_ok=True)
+                    except Exception as e:
+                        print(f"Warning: Could not create voice directory: {e}")
+                        ctx_session['voice_dir'] = tempfile.mkdtemp(prefix=f'voice_{session_id}_')
+                    
+                    # Set up custom model directory for this session  
+                    try:
+                        ctx_session['custom_model_dir'] = os.path.join(models_dir, '__sessions', f"custom_model-{session_id}")
+                        os.makedirs(ctx_session['custom_model_dir'], exist_ok=True)
+                    except Exception as e:
+                        print(f"Warning: Could not create custom model directory: {e}")
+                        ctx_session['custom_model_dir'] = tempfile.mkdtemp(prefix=f'model_{session_id}_')
+                    
                     # Set default TTS engine parameters
                     for engine, params in default_engine_settings.items():
                         for param, value in params.items():
@@ -141,11 +161,19 @@ class FlaskInterface:
             
             try:
                 session_id = session.get('session_id')
+                if not session_id:
+                    return jsonify({'error': 'No session found'}), 400
+                    
                 ctx_session = self.ctx.get_session(session_id)
                 
+                # Ensure temp_dir exists for this session
+                if not ctx_session.get('temp_dir') or not os.path.exists(ctx_session.get('temp_dir', '')):
+                    ctx_session['temp_dir'] = tempfile.mkdtemp(prefix=f'ebook2audiobook_session_{session_id}_')
+                
                 filename = secure_filename(file.filename)
-                filepath = os.path.join(ctx_session['temp_dir'], 'uploads', filename)
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                upload_dir = os.path.join(ctx_session['temp_dir'], 'uploads')
+                os.makedirs(upload_dir, exist_ok=True)
+                filepath = os.path.join(upload_dir, filename)
                 file.save(filepath)
                 
                 ctx_session['ebook'] = filepath
@@ -204,6 +232,10 @@ class FlaskInterface:
                 
                 ctx_session = self.ctx.get_session(session_id)
                 ctx_session['language'] = language
+                
+                # Update voice directory for new language
+                ctx_session['voice_dir'] = os.path.join(voices_dir, '__sessions', f"voice-{session_id}", language)
+                os.makedirs(ctx_session['voice_dir'], exist_ok=True)
                 
                 # Update TTS engines based on language
                 compatible_engines = get_compatible_tts_engines(language)
@@ -301,23 +333,27 @@ class FlaskInterface:
                 voice_name = os.path.splitext(filename)[0].replace('&', 'And')
                 sanitized_name = get_sanitized(voice_name)
                 
-                voice_extractor = VoiceExtractor()
-                voice_dir = os.path.join(ctx_session['voices_dir'], sanitized_name)
+                if VoiceExtractor is None:
+                    return jsonify({'error': 'Voice extraction not available - audio dependencies missing'}), 500
                 
-                success = voice_extractor.extract_voice(temp_path, voice_dir, sanitized_name)
+                extractor = VoiceExtractor(ctx_session, temp_path, sanitized_name)
+                status, msg = extractor.extract_voice()
                 
                 # Clean up temp file
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
                 
-                if success:
+                if status:
+                    final_voice_file = os.path.join(ctx_session['voice_dir'], f'{sanitized_name}_24000.wav')
+                    ctx_session['voice'] = final_voice_file
+                    
                     return jsonify({
                         'success': True,
                         'voice_name': sanitized_name,
                         'voice_options': self.get_voice_options(session_id)
                     })
                 else:
-                    return jsonify({'error': 'Failed to extract voice'}), 500
+                    return jsonify({'error': f'Voice extraction failed: {msg}'}), 500
                     
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -341,7 +377,7 @@ class FlaskInterface:
                 
                 if voice:
                     # Find voice file for preview
-                    voice_dir = os.path.join(ctx_session['voices_dir'], voice)
+                    voice_dir = os.path.join(ctx_session['voice_dir'], voice)
                     if os.path.exists(voice_dir):
                         # Look for voice files in the directory
                         for ext in voice_formats:
@@ -371,7 +407,7 @@ class FlaskInterface:
                     return jsonify({'error': 'Missing voice name or session'}), 400
                 
                 ctx_session = self.ctx.get_session(session_id)
-                voice_dir = os.path.join(ctx_session['voices_dir'], voice_name)
+                voice_dir = os.path.join(ctx_session['voice_dir'], voice_name)
                 
                 if os.path.exists(voice_dir):
                     shutil.rmtree(voice_dir)
@@ -398,8 +434,8 @@ class FlaskInterface:
                 ctx_session = self.ctx.get_session(session_id)
                 
                 # Security: ensure filename is within voices directory
-                safe_path = os.path.join(ctx_session['voices_dir'], secure_filename(filename))
-                if os.path.exists(safe_path) and safe_path.startswith(ctx_session['voices_dir']):
+                safe_path = os.path.join(ctx_session['voice_dir'], secure_filename(filename))
+                if os.path.exists(safe_path) and safe_path.startswith(ctx_session['voice_dir']):
                     return send_file(safe_path)
                 else:
                     return jsonify({'error': 'Voice file not found'}), 404
