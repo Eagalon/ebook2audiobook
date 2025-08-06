@@ -68,5 +68,5 @@ tmp/
 temp/
 
 # Piper TTS models (auto-downloaded)
-models/pip/
+models/tts/
 models/models--rhasspy--piper-voices/
