@@ -1,0 +1,7 @@
+#!/home/runner/work/ebook2audiobook/ebook2audiobook/python_env/bin/python
+
+from argostranslate import cli
+
+cli.main()
+
+
