@@ -88,9 +88,34 @@ class Piper:
                     # Download voice model from HuggingFace
                     repo_id = models[TTS_ENGINES['PIPER']]['internal']['repo']
                     
-                    # Get model files based on voice name
-                    model_file = f"{voice_name}.onnx"
-                    config_file = f"{voice_name}.onnx.json"
+                    # Get model files based on voice name  
+                    # Map voice name to correct path in repository
+                    voice_path_map = {
+                        'en_US-lessac-medium': 'en/en_US/lessac/medium/en_US-lessac-medium',
+                        'en_US-lessac-high': 'en/en_US/lessac/high/en_US-lessac-high', 
+                        'en_US-lessac-low': 'en/en_US/lessac/low/en_US-lessac-low',
+                        'fr_FR-upmc-medium': 'fr/fr_FR/upmc/medium/fr_FR-upmc-medium',
+                        'de_DE-thorsten-medium': 'de/de_DE/thorsten/medium/de_DE-thorsten-medium',
+                        'es_ES-davefx-medium': 'es/es_ES/davefx/medium/es_ES-davefx-medium',
+                        'it_IT-riccardo-x_low': 'it/it_IT/riccardo/x_low/it_IT-riccardo-x_low',
+                        'pt_BR-edresson-low': 'pt/pt_BR/edresson/low/pt_BR-edresson-low'
+                    }
+                    
+                    voice_path = voice_path_map.get(voice_name)
+                    if not voice_path:
+                        # If voice not in map, try to construct path from voice name
+                        parts = voice_name.split('-')
+                        if len(parts) >= 3:
+                            lang_code = parts[0].split('_')[0].lower()
+                            country_voice = parts[0]
+                            speaker = parts[1] 
+                            quality = '-'.join(parts[2:])
+                            voice_path = f"{lang_code}/{country_voice}/{speaker}/{quality}/{voice_name}"
+                        else:
+                            raise ValueError(f"Unknown voice format: {voice_name}")
+                    
+                    model_file = f"{voice_path}.onnx"
+                    config_file = f"{voice_path}.onnx.json"
                     
                     # Download the model files
                     model_path = hf_hub_download(
@@ -182,6 +207,7 @@ class Piper:
                     if is_audio_data_valid(audio_sentence):
                         sourceTensor = self._tensor_type(audio_sentence)
                         audio_tensor = sourceTensor.clone().detach().unsqueeze(0).cpu()
+                        trim_audio_buffer = 0.004
                         if sentence[-1].isalnum() or sentence[-1] == '—':
                             audio_tensor = trim_audio(audio_tensor.squeeze(), settings['samplerate'], 0.003, trim_audio_buffer).unsqueeze(0)
                         self.audio_segments.append(audio_tensor)
