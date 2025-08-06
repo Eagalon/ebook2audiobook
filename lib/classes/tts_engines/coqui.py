@@ -155,6 +155,14 @@ class Coqui:
                     else:
                         model_path = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
                         tts = self._load_api(self.tts_key, model_path, self.session['device'])
+                elif self.session['tts_engine'] == TTS_ENGINES['F5-TTS']:
+                    if self.session['custom_model'] is not None:
+                        msg = f"{self.session['tts_engine']} custom model not implemented yet!"
+                        print(msg)
+                        return False
+                    else:
+                        model_path = models[self.session['tts_engine']][self.session['fine_tuned']]['repo']
+                        tts = self._load_api(self.tts_key, model_path, self.session['device'])
             if load_zeroshot:
                 tts_vc = (loaded_tts.get(self.tts_vc_key) or {}).get('engine', False)
                 if not tts_vc:
@@ -174,14 +182,28 @@ class Coqui:
             if key in loaded_tts.keys():
                 return loaded_tts[key]['engine']
             unload_tts(device, [self.tts_key, self.tts_vc_key])
-            from TTS.api import TTS as coquiAPI
             with lock:
-                tts = coquiAPI(model_path)
+                # Handle F5-TTS separately
+                if self.session['tts_engine'] == TTS_ENGINES['F5-TTS']:
+                    try:
+                        from f5_tts.api import F5TTS
+                        tts = F5TTS(model=model_path, device=device)
+                    except ImportError:
+                        error = 'F5-TTS not installed. Please install with: pip install f5-tts'
+                        print(error)
+                        return False
+                else:
+                    # Use Coqui TTS API for other engines
+                    from TTS.api import TTS as coquiAPI
+                    tts = coquiAPI(model_path)
+                
                 if tts:
-                    if device == 'cuda':
-                        tts.cuda()
-                    else:
-                        tts.to(device)
+                    if self.session['tts_engine'] != TTS_ENGINES['F5-TTS']:
+                        # Apply device settings for Coqui TTS
+                        if device == 'cuda':
+                            tts.cuda()
+                        else:
+                            tts.to(device)
                     loaded_tts[key] = {"engine": tts, "config": None} 
                     msg = f'{model_path} Loaded!'
                     print(msg)
@@ -778,6 +800,38 @@ class Coqui:
                                 language=language,
                                 **speaker_argument
                             )
+                    elif self.session['tts_engine'] == TTS_ENGINES['F5-TTS']:
+                        # F5-TTS requires reference text and audio for voice cloning
+                        ref_text = "This is a reference audio for voice cloning."
+                        if settings['voice_path'] and os.path.exists(settings['voice_path']):
+                            # Use provided reference audio
+                            ref_audio_path = settings['voice_path']
+                        else:
+                            # Fallback to default voice
+                            ref_audio_path = models[self.session['tts_engine']][self.session['fine_tuned']]['voice']
+                        
+                        # Resample reference audio to expected sample rate if needed
+                        if ref_audio_path:
+                            ref_audio_path = self._resample_wav(ref_audio_path, settings['samplerate'])
+                        
+                        # Get F5-TTS parameters from models configuration
+                        f5_settings = default_engine_settings[TTS_ENGINES['F5-TTS']]
+                        
+                        # Generate audio using F5-TTS API
+                        wav, sr, spec = tts.infer(
+                            ref_file=ref_audio_path,
+                            ref_text=ref_text,
+                            gen_text=sentence,
+                            target_rms=0.1,
+                            cross_fade_duration=f5_settings.get('cross_fade_duration', 0.15),
+                            nfe_step=f5_settings.get('nfe_step', 32),
+                            cfg_strength=f5_settings.get('cfg_strength', 2),
+                            speed=f5_settings.get('speed', 1.0),
+                            remove_silence=False
+                        )
+                        
+                        # Convert numpy array to tensor
+                        audio_sentence = torch.from_numpy(wav).float()
                     if is_audio_data_valid(audio_sentence):
                         sourceTensor = self._tensor_type(audio_sentence)
                         audio_tensor = sourceTensor.clone().detach().unsqueeze(0).cpu()
