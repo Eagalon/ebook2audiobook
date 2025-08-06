@@ -9,17 +9,12 @@ class TTSManager:
         self._build()
  
     def _build(self):
-        if self.session['tts_engine'] == TTS_ENGINES['PIPER']:
-            from lib.classes.tts_engines.piper import Piper
-            self.tts = Piper(self.session)
-            if self.tts:
-                return True
-            else:
-                error = 'PIPER TTS engine could not be created!'
-                print(error)
-        elif self.session['tts_engine'] in TTS_ENGINES.values():
-            from lib.classes.tts_engines.coqui import Coqui
-            self.tts = Coqui(self.session)
+        if self.session['tts_engine'] in TTS_ENGINES.values():
+            if self.session['tts_engine'] in [TTS_ENGINES['XTTSv2'], TTS_ENGINES['BARK'], TTS_ENGINES['VITS'], TTS_ENGINES['FAIRSEQ'], TTS_ENGINES['TACOTRON2'], TTS_ENGINES['YOURTTS']]:
+                from lib.classes.tts_engines.coqui import Coqui
+                self.tts = Coqui(self.session)
+            #elif self.session['tts_engine'] in [TTS_ENGINES['NEW_TTS']]:
+            #    self.tts = NewTts(self.session)
             if self.tts:
                 return True
             else:
@@ -31,7 +26,7 @@ class TTSManager:
 
     def convert_sentence2audio(self, sentence_number, sentence):
         try:
-            if self.session['tts_engine'] == TTS_ENGINES['PIPER'] or self.session['tts_engine'] in TTS_ENGINES.values():
+            if self.session['tts_engine'] in TTS_ENGINES.values():
                 return self.tts.convert(sentence_number, sentence)
             else:
                 print('Other TTS engines coming soon!')    
