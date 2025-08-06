@@ -6,7 +6,6 @@ import subprocess
 import tempfile
 import threading
 import uuid
-import wave
 
 import numpy as np
 import regex as re
@@ -176,54 +175,25 @@ class Piper:
                     return True
                 else:
                     if self.session['tts_engine'] == TTS_ENGINES['PIPER']:
-                        # Generate audio using Piper
+                        # Generate audio using Piper  
                         try:
-                            # Create a temporary WAV file for Piper output
-                            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
-                                temp_wav_path = temp_wav.name
+                            # Use Piper's synthesize method to generate audio data directly
+                            audio_bytes = bytes()
                             
-                            try:
-                                # Use Piper's synthesize method to generate audio directly to WAV file
-                                with wave.open(temp_wav_path, 'wb') as wav_file:
-                                    tts.synthesize(sentence, wav_file)
+                            # Collect audio data from Piper synthesis
+                            for audio_chunk in tts.synthesize(sentence):
+                                audio_bytes += audio_chunk
+                            
+                            if len(audio_bytes) == 0:
+                                error = 'No audio data generated from Piper'
+                                print(error)
+                                audio_sentence = None
+                            else:
+                                # Convert bytes to numpy array (Piper typically outputs 16-bit mono PCM)
+                                audio_array = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+                                # Normalize to [-1, 1] range
+                                audio_sentence = audio_array / 32768.0
                                 
-                                # Read the WAV file and extract audio data
-                                with wave.open(temp_wav_path, 'rb') as wav_file:
-                                    frames = wav_file.getnframes()
-                                    sample_rate = wav_file.getframerate()
-                                    sample_width = wav_file.getsampwidth()
-                                    channels = wav_file.getnchannels()
-                                    
-                                    if frames == 0:
-                                        error = 'Generated WAV file contains no audio frames'
-                                        print(error)
-                                        audio_sentence = None
-                                    else:
-                                        # Read the raw audio data
-                                        audio_data = wav_file.readframes(frames)
-                                        
-                                        # Convert raw audio data to numpy array
-                                        if sample_width == 2:
-                                            # 16-bit audio (most common for Piper)
-                                            audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
-                                            audio_array = audio_array / 32768.0
-                                        else:
-                                            error = f'Unsupported sample width: {sample_width}'
-                                            print(error)
-                                            audio_sentence = None
-                                            
-                                        if audio_array is not None:
-                                            # Handle multi-channel audio by taking only the first channel
-                                            if channels > 1:
-                                                audio_array = audio_array.reshape(-1, channels)[:, 0]
-                                            
-                                            audio_sentence = audio_array
-                                            
-                            finally:
-                                # Clean up temporary file
-                                if os.path.exists(temp_wav_path):
-                                    os.unlink(temp_wav_path)
-                                    
                         except Exception as e:
                             error = f'Error synthesizing with Piper: {e}'
                             print(error)
